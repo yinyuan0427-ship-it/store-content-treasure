@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { useAuth } from '../App';
 import { useNavigate } from 'react-router-dom';
-import { Settings, Store, Briefcase, Truck, LogIn } from 'lucide-react';
+import { Store, Briefcase, Truck, LogIn } from 'lucide-react';
 
 export default function Login() {
   const [phone, setPhone] = useState('');
@@ -72,12 +72,8 @@ export default function Login() {
         </form>
 
         <div className="mt-6 p-4 bg-surface-50 rounded-xl border border-surface-200">
-          <p className="text-xs text-surface-400 mb-2.5 font-medium">测试账号（密码均为 123456，管理员为 admin123）</p>
+          <p className="text-xs text-surface-400 mb-2.5 font-medium">测试账号（密码均为 123456）</p>
           <div className="space-y-0.5">
-            <button onClick={() => { setPhone('admin'); setPassword('admin123'); }}
-              className="w-full text-left text-xs text-surface-500 hover:text-navy-700 transition-colors py-1 rounded-lg px-2 hover:bg-surface-100">
-              <Settings size={12} className="inline mr-1.5" />管理员：admin / admin123
-            </button>
             <button onClick={() => { setPhone('dealer001'); setPassword('123456'); }}
               className="w-full text-left text-xs text-surface-500 hover:text-navy-700 transition-colors py-1 rounded-lg px-2 hover:bg-surface-100">
               <Store size={12} className="inline mr-1.5" />门店老板：dealer001 / 123456
