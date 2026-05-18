@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #fafaf9;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* ── 手机 App 容器 ── */
+#root {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
+  background: #fafaf9;
+  box-shadow: 0 0 80px rgba(0, 0, 0, 0.08);
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+/* ── 滚动 ── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.category-tabs {
+  overflow-x: auto; white-space: nowrap;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── 图片轮播 ── */
+.image-carousel {
+  display: flex; overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+.image-carousel > * {
+  scroll-snap-align: start; flex-shrink: 0;
+}
+
+/* ── Toast 动画 ── */
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.toast-enter {
+  animation: toast-in 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── 淡入动画 ── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fade-up 0.4s ease-out both;
+}
+.animate-fade-up:nth-child(1) { animation-delay: 0s; }
+.animate-fade-up:nth-child(2) { animation-delay: 0.08s; }
+.animate-fade-up:nth-child(3) { animation-delay: 0.16s; }
+.animate-fade-up:nth-child(4) { animation-delay: 0.24s; }
+
+/* ── 通用卡片样式 ── */
+@layer components {
+  .card {
+    @apply bg-white rounded-2xl shadow-card;
+  }
+  .card-padded {
+    @apply bg-white rounded-2xl shadow-card p-4;
+  }
+  .card-premium {
+    @apply bg-white rounded-3xl shadow-premium p-5;
+  }
+
+  /* 玻璃卡片 — 半透明+模糊 */
+  .glass-card {
+    @apply rounded-2xl;
+    background: rgba(255,255,255,0.22);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.5);
+  }
+  .glass-card-dark {
+    @apply rounded-2xl;
+    background: rgba(255,255,255,0.10);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.12);
+  }
+
+  /* 品牌 Hero 渐变 */
+  .hero-gradient {
+    background: linear-gradient(160deg, #0f1b32 0%, #1a2b4a 30%, #1e3a5f 60%, #162544 100%);
+  }
+
+  /* 柔和光影背景 */
+  .soft-glow {
+    position: relative;
+  }
+  .soft-glow::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: -20%;
+    width: 80%;
+    height: 120%;
+    background: radial-gradient(ellipse, rgba(59,130,246,0.12) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* 暖金光晕 — 用于精选/积分/奖励 */
+  .warm-glow {
+    background: linear-gradient(135deg, rgba(245,169,50,0.08) 0%, rgba(245,169,50,0.02) 100%);
+    border: 1px solid rgba(245,169,50,0.15);
+  }
+}
+
+/* ── 安全区 ── */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ── 玻璃拟态 ── */
+.glass {
+  background: rgba(255,255,255,0.18);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+.glass-dark {
+  background: rgba(0,0,0,0.15);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* ── 品牌强调线 ── */
+.accent-line {
+  position: relative;
+}
+.accent-line::after {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 3px;
+  background: linear-gradient(90deg, #f5a932, #e37608);
+  border-radius: 2px;
+  margin-top: 8px;
+}

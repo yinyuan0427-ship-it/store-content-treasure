@@ -1,0 +1,35 @@
+# cc-connect configuration for store-content-treasure
+# 门店内容宝 - TEMPUR经销商H5案例营销工具
+
+language = "zh"
+
+[log]
+level = "info"
+
+# =============================================================================
+# Project: store-content-treasure
+# =============================================================================
+
+[[projects]]
+name = "store-content-treasure"
+
+[projects.agent]
+type = "claudecode"
+
+[projects.agent.options]
+work_dir = "C:\\Users\\殷\\store-content-treasure"
+mode = "default"
+
+# 飞书 Bot 配置
+# 1. 打开 https://open.feishu.cn 创建企业自建应用
+# 2. 添加「机器人」能力
+# 3. 在「事件订阅」中添加 im.message.receive_v1 事件，选择 WebSocket 长连接模式
+# 4. 发布应用（需管理员审批）
+# 5. 将 app_id 和 app_secret 填入下方
+
+[[projects.platforms]]
+type = "feishu"
+
+[projects.platforms.options]
+app_id = "cli_aa800e39e1b95bcf"
+app_secret = "uzhxdbq2Q43cvsZRZvaUGhWH6uvmCBDp"
