@@ -7,11 +7,11 @@ import { copyText } from '../utils/clipboard';
 import CopyModal from '../components/CopyModal';
 
 const salesTabs = [
-  { key: 'mine', label: '我的案例' },
+  { key: 'all_shareable', label: '全部案例' },
+  { key: 'mine', label: '我的跟进' },
   { key: 'need_story', label: '待补故事' },
   { key: 'pending', label: '待审核' },
   { key: 'approved', label: '已通过' },
-  { key: 'shareable', label: '可分享' },
   { key: 'rejected', label: '被驳回' },
   { key: 'dup', label: '疑似重复' },
 ];
@@ -56,8 +56,13 @@ export default function CasesHub() {
     }
   }, [user?.role, navigate]);
 
+  const getShareSalesId = (task: typeof mockDeliveryTasks[number]) => {
+    if (user?.role === 'sales') return getSalesByUserId(user.phone)?.id || task.salesId;
+    return task.salesId;
+  };
+
   const handleCopyCaseLink = async (task: typeof mockDeliveryTasks[number]) => {
-    const link = `${window.location.origin}/share/${task.id}?salesId=${task.salesId}`;
+    const link = `${window.location.origin}/share/${task.id}?salesId=${getShareSalesId(task)}`;
     const result = await copyText(link);
     if (result.success) {
       showToast('案例链接已复制，可以发给意向客户');
@@ -70,6 +75,12 @@ export default function CasesHub() {
   const initialTab = params.get('tab') || 'mine';
   const [activeTab, setActiveTab] = useState(initialTab);
   const [salesFilter, setSalesFilter] = useState('all');
+
+  useEffect(() => {
+    if (user?.role === 'sales' && !params.get('tab') && activeTab === 'mine') {
+      setActiveTab('all_shareable');
+    }
+  }, [user?.role, activeTab, params]);
 
   const storeSales = useMemo(() => {
     if (user?.role !== 'dealer_owner') return [];
@@ -97,15 +108,16 @@ export default function CasesHub() {
       case 'sales': {
         const salesId = getSalesByUserId(user.phone)?.id || '';
         const tasks = allTasks.filter(t => t.salesId === salesId);
+        const shareableTasks = getShareableCases();
         return {
-          title: '我的案例',
+          title: '案例素材库',
           tabs: salesTabs,
           filterFn: (tab: string) => {
             switch (tab) {
+              case 'all_shareable': return shareableTasks;
               case 'need_story': return tasks.filter(t => t.installImages.length > 0 && !t.storyWhy && t.reviewStatus !== 'rejected');
               case 'pending': return tasks.filter(t => t.reviewStatus === 'pending' || t.reviewStatus === 'story_done');
               case 'approved': return tasks.filter(t => t.reviewStatus === 'approved' || t.reviewStatus === 'featured');
-              case 'shareable': return tasks.filter(t => canShareCase(t));
               case 'rejected': return tasks.filter(t => t.reviewStatus === 'rejected');
               case 'dup': return tasks.filter(t => t.reviewStatus === 'suspected_dup' || t.reviewStatus === 'confirmed_dup');
               default: return tasks;
@@ -325,7 +337,7 @@ export default function CasesHub() {
                           <Copy size={11} /> 一键复制链接
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); navigate(`/share/${task.id}?salesId=${task.salesId}`); }}
+                          onClick={(e) => { e.stopPropagation(); navigate(`/share/${task.id}?salesId=${getShareSalesId(task)}`); }}
                           className="h-8 px-3 bg-green-50 text-green-700 font-medium rounded-lg text-[11px] active:bg-green-100 transition-colors flex items-center gap-1"
                         >
                           <Send size={11} /> 发给客户
@@ -399,7 +411,10 @@ function ShareCollectionSection({ salesId, isOwner, storeId, storeName }: { sale
   const navigate = useNavigate();
   const [showCollections, setShowCollections] = useState(false);
 
-  const shareable = getShareableCases();
+  const shareable = getShareableCases().filter(t => {
+    if (isOwner && storeId) return t.storeId === storeId;
+    return true;
+  });
   const ownerQuery = isOwner && storeId
     ? `&sourceStoreId=${encodeURIComponent(storeId)}&sourceStoreName=${encodeURIComponent(storeName || '')}`
     : '';

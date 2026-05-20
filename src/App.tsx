@@ -78,7 +78,7 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
 
 // 隐藏底部导航的路径
 const hideNavPaths = ['/login', '/cases', '/admin/delivery', '/admin/leads', '/admin/products'];
-const hideNavPrefixes = ['/save-images/', '/delivery/upload/', '/delivery/story/', '/delivery/create', '/cases/', '/lead-form/', '/share/', '/deal-report/', '/admin/products/'];
+const hideNavPrefixes = ['/save-images/', '/delivery/upload/', '/delivery/story/', '/delivery/detail/', '/delivery/create', '/cases/', '/lead-form/', '/share/', '/deal-report/', '/admin/products/'];
 
 function shouldHideNav(pathname: string) {
   if (hideNavPaths.includes(pathname)) return true;

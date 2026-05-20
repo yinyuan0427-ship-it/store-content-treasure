@@ -180,6 +180,7 @@ export interface PointRecord {
   points: number;
   relatedCaseId?: string;
   createdAt: string;
+  status?: 'credited' | 'pending' | 'revoked';
 }
 
 export interface RankItem {
@@ -1155,6 +1156,7 @@ export interface CaseCoinRecord {
   relatedCaseId?: string;
   relatedMaterialId?: string;
   createdAt: string;
+  status?: 'issued' | 'pending' | 'revoked';
 }
 
 export const CASE_COIN_RULES = {

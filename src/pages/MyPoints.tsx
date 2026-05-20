@@ -1,8 +1,8 @@
-import { useNavigate } from 'react-router-dom';
-import { useMemo, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useMemo, useState, useEffect } from 'react';
 import { useAuth } from '../App';
 import { getAllPointRecords, mockSalesRank, mockInstallerRank, mockStoreRank, mockCityRank, getCaseCoinRecords, getCaseCoinBalance, getDeliveryPointRecords, getDeliveryPointBalance, mockSalesPersons } from '../mock/data';
-import { Trophy, Truck, FileText, Coins, Award, Camera, Store } from 'lucide-react';
+import { Trophy, Truck, FileText, Coins, Award, Camera, Store, ArrowLeft, ChevronRight } from 'lucide-react';
 
 const rankTabs = [
   { key: 'sales', label: '销售榜' },
@@ -11,11 +11,58 @@ const rankTabs = [
   { key: 'city', label: '城市榜' },
 ];
 
+const pointTypeConfig: Record<string, { label: string; color: string }> = {
+  submission: { label: '投稿奖励', color: 'text-green-600' },
+  login: { label: '登录奖励', color: 'text-blue-600' },
+  weekly: { label: '满签奖励', color: 'text-purple-600' },
+  featured: { label: '精选奖励', color: 'text-amber-600' },
+  delivery_create: { label: '创建采集', color: 'text-blue-500' },
+  install_upload: { label: '上传照片', color: 'text-green-500' },
+  install_note: { label: '完善信息', color: 'text-teal-500' },
+  delivery_story: { label: '补充故事', color: 'text-indigo-500' },
+  delivery_approved: { label: '案例通过', color: 'text-emerald-600' },
+  install_featured: { label: '安装精选', color: 'text-amber-500' },
+  sales_featured: { label: '销售精选', color: 'text-amber-500' },
+  store_delivery: { label: '门店奖励', color: 'text-orange-500' },
+};
+
+const coinTypeConfig: Record<string, { label: string; color: string }> = {
+  starter: { label: '新人赠送', color: 'text-blue-500' },
+  approved_case: { label: '案例通过', color: 'text-emerald-600' },
+  featured_case: { label: '精选奖励', color: 'text-amber-500' },
+  saved_by_other: { label: '被他人保存', color: 'text-purple-500' },
+  save_single: { label: '下载案例图', color: 'text-red-500' },
+  save_set: { label: '批量下载图', color: 'text-red-500' },
+};
+
+const pointStatusConfig: Record<string, { label: string; cls: string }> = {
+  credited: { label: '已入账', cls: 'bg-green-50 text-green-600' },
+  pending: { label: '待审核', cls: 'bg-blue-50 text-blue-600' },
+  revoked: { label: '已撤回', cls: 'bg-red-50 text-red-500' },
+};
+
+const coinStatusConfig: Record<string, { label: string; cls: string }> = {
+  issued: { label: '已发放', cls: 'bg-green-50 text-green-600' },
+  pending: { label: '待发放', cls: 'bg-blue-50 text-blue-600' },
+  revoked: { label: '已撤回', cls: 'bg-red-50 text-red-500' },
+};
+
 export default function MyPoints() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [rankTab, setRankTab] = useState('sales');
-  const [viewTab, setViewTab] = useState<'points' | 'coins'>('points');
+
+  const params = new URLSearchParams(location.search);
+  const tabParam = params.get('tab');
+  const [viewTab, setViewTab] = useState<'points' | 'coins'>(
+    tabParam === 'coins' ? 'coins' : 'points'
+  );
+
+  useEffect(() => {
+    if (tabParam === 'coins') setViewTab('coins');
+    else setViewTab('points');
+  }, [tabParam]);
 
   const uid = user?.phone || '';
 
@@ -24,10 +71,10 @@ export default function MyPoints() {
     () => allPointRecords.reduce((sum, r) => sum + r.points, 0),
     [allPointRecords]
   );
-  const monthPoints = useMemo(
-    () => allPointRecords.filter(r => r.createdAt.startsWith('2026-05')).reduce((sum, r) => sum + r.points, 0),
-    [allPointRecords]
-  );
+  const monthPoints = useMemo(() => {
+    const month = new Date().toISOString().slice(0, 7);
+    return allPointRecords.filter(r => r.createdAt.startsWith(month)).reduce((sum, r) => sum + r.points, 0);
+  }, [allPointRecords]);
   const totalCount = allPointRecords.length;
   const positiveCount = allPointRecords.filter(r => r.points > 0).length;
 
@@ -50,30 +97,6 @@ export default function MyPoints() {
     return mockSalesPersons.filter(s => s.storeId === user.storeId).length;
   }, [isDealerOwner, user?.storeId]);
 
-  const pointTypeConfig: Record<string, { label: string; color: string }> = {
-    submission: { label: '投稿奖励', color: 'text-green-600' },
-    login: { label: '登录奖励', color: 'text-blue-600' },
-    weekly: { label: '满签奖励', color: 'text-purple-600' },
-    featured: { label: '精选奖励', color: 'text-amber-600' },
-    delivery_create: { label: '创建采集', color: 'text-blue-500' },
-    install_upload: { label: '上传照片', color: 'text-green-500' },
-    install_note: { label: '完善信息', color: 'text-teal-500' },
-    delivery_story: { label: '补充故事', color: 'text-indigo-500' },
-    delivery_approved: { label: '案例通过', color: 'text-emerald-600' },
-    install_featured: { label: '安装精选', color: 'text-amber-500' },
-    sales_featured: { label: '销售精选', color: 'text-amber-500' },
-    store_delivery: { label: '门店奖励', color: 'text-orange-500' },
-  };
-
-  const coinTypeConfig: Record<string, { label: string; color: string }> = {
-    starter: { label: '新人赠送', color: 'text-blue-500' },
-    approved_case: { label: '案例通过', color: 'text-emerald-600' },
-    featured_case: { label: '精选奖励', color: 'text-amber-500' },
-    saved_by_other: { label: '被他人保存', color: 'text-purple-500' },
-    save_single: { label: '下载案例图', color: 'text-red-500' },
-    save_set: { label: '批量下载图', color: 'text-red-500' },
-  };
-
   const rankData = rankTab === 'sales' ? mockSalesRank :
     rankTab === 'installer' ? mockInstallerRank :
     rankTab === 'city' ? mockCityRank : mockStoreRank;
@@ -91,11 +114,16 @@ export default function MyPoints() {
         <div className="absolute bottom-0 left-0 w-32 h-32 bg-amber-400/6 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative z-10">
-          <h1 className="text-white text-lg font-semibold mb-6">
-            {user?.role === 'installer' ? '交付积分' :
-             user?.role === 'dealer_owner' ? '门店积分' :
-             user?.role === 'sales' ? '销售积分' : '我的积分'}
-          </h1>
+          <div className="flex items-center gap-3 mb-6">
+            <button onClick={() => navigate('/profile')} className="text-white/70 active:text-white">
+              <ArrowLeft size={22} />
+            </button>
+            <h1 className="text-white text-lg font-semibold">
+              {viewTab === 'coins' ? '案例币明细' :
+               user?.role === 'installer' ? '交付积分' :
+               user?.role === 'dealer_owner' ? '门店积分' : '积分明细'}
+            </h1>
+          </div>
 
           {isInstaller ? (
           <div className="text-center">
@@ -115,9 +143,13 @@ export default function MyPoints() {
           </div>
           ) : (
           <div className="text-center">
-            <div className="text-5xl font-bold text-white tracking-tight">{totalPoints}</div>
-            <p className="text-blue-200/70 text-sm mt-1">当前积分</p>
-            {myRank > 0 && (
+            <div className="text-5xl font-bold text-white tracking-tight">
+              {viewTab === 'coins' ? coinBalance : totalPoints}
+            </div>
+            <p className="text-blue-200/70 text-sm mt-1">
+              {viewTab === 'coins' ? '案例币余额' : '当前积分'}
+            </p>
+            {viewTab === 'points' && myRank > 0 && (
               <div className="inline-flex items-center gap-1 mt-2 bg-white/15 backdrop-blur rounded-full px-3 py-1 border border-white/10">
                 <Trophy size={12} className="text-warm-400" />
                 <span className="text-white/90 text-xs">{rankTabs.find(t => t.key === rankTab)?.label}第 {myRank} 名</span>
@@ -126,7 +158,7 @@ export default function MyPoints() {
           </div>
           )}
 
-          {/* Stats */}
+          {/* Stats row */}
           {isInstaller ? (
           <div className="grid grid-cols-3 gap-3 mt-6">
             {[
@@ -170,61 +202,75 @@ export default function MyPoints() {
         </div>
       </div>
 
-      {/* ── View Tabs ── */}
+      {/* ── View Tabs (sales/dealer_owner only, segmented control in white area) ── */}
       {!isInstaller && !isAdmin && (
-      <div className="px-4 -mt-4 relative z-10">
-        <div className="flex gap-1 mb-3">
-          <button onClick={() => setViewTab('points')}
-            className={`flex-1 py-2 rounded-full text-sm font-semibold transition-all ${
-              viewTab === 'points' ? 'bg-white text-navy-700 shadow-card' : 'text-blue-200/80'
-            }`}>
+      <div className="px-4 mt-3">
+        <div className="flex bg-surface-100 rounded-full p-1 h-[42px]">
+          <button
+            onClick={() => { setViewTab('points'); navigate('?tab=points', { replace: true }); }}
+            className={`flex-1 rounded-full text-sm font-medium transition-all flex items-center justify-center ${
+              viewTab === 'points' ? 'bg-navy-800 text-white shadow-sm' : 'text-surface-500'
+            }`}
+          >
             成长积分
           </button>
-          <button onClick={() => setViewTab('coins')}
-            className={`flex-1 py-2 rounded-full text-sm font-semibold transition-all ${
-              viewTab === 'coins' ? 'bg-white text-amber-700 shadow-card' : 'text-blue-200/80'
-            }`}>
-            案例币 · {coinBalance}
+          <button
+            onClick={() => { setViewTab('coins'); navigate('?tab=coins', { replace: true }); }}
+            className={`flex-1 rounded-full text-sm font-medium transition-all flex items-center justify-center ${
+              viewTab === 'coins' ? 'bg-navy-800 text-white shadow-sm' : 'text-surface-500'
+            }`}
+          >
+            案例币
           </button>
         </div>
       </div>
       )}
 
-      {/* ── Case Coin Ledger ── */}
-      {viewTab === 'coins' && (
-        <div className="px-4 mt-2">
+      {/* ═══════════════════════════════════ */}
+      {/* ── 案例币明细 ── */}
+      {/* ═══════════════════════════════════ */}
+      {viewTab === 'coins' && !isInstaller && (
+        <div className="px-4 mt-3">
           <div className="bg-white rounded-2xl shadow-card p-4 mb-4">
             <div className="flex items-center gap-3 mb-1">
               <Coins size={20} className="text-amber-500" />
               <span className="text-lg font-bold text-amber-600">{coinBalance}</span>
               <span className="text-sm text-surface-400">案例币</span>
             </div>
-            <p className="text-xs text-surface-400">上传真实案例获得案例币，用于交换保存其他客户案例高清图</p>
+            <p className="text-xs text-surface-400">上传并通过审核的案例可获得案例币奖励。案例币用于兑换权益，不参与排行榜计算。</p>
           </div>
 
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">案例币流水</h3>
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">案例币明细</h3>
           {coinRecords.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-surface-400">
               <Coins size={40} strokeWidth={1} className="mb-3" />
               <p className="text-sm">暂无案例币记录</p>
-              <p className="text-xs mt-1">上传真实客户案例审核通过后获得案例币，用于交换保存案例高清图</p>
+              <p className="text-xs mt-1">上传真实客户案例审核通过后获得案例币</p>
             </div>
           ) : (
             <div className="space-y-2">
               {coinRecords.map((record) => {
                 const typeCfg = coinTypeConfig[record.type];
                 const amt = typeof record.amount === 'number' ? record.amount : 0;
+                const statusCfg = coinStatusConfig[record.status || 'issued'];
                 return (
-                <div key={record.id} className="bg-white rounded-xl px-4 py-3 flex items-center justify-between shadow-card">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-700 truncate">{record.description}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      {typeCfg && <span className={`text-[10px] font-medium ${typeCfg.color}`}>{typeCfg.label}</span>}
-                      <span className="text-xs text-surface-400">{record.createdAt.slice(0, 16).replace('T', ' ')}</span>
+                <div key={record.id} className="bg-white rounded-xl px-4 py-3 shadow-card">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-700 truncate">{record.description}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {typeCfg && <span className={`text-[10px] font-medium ${typeCfg.color}`}>{typeCfg.label}</span>}
+                        <span className="text-xs text-surface-400">{record.createdAt.slice(0, 16).replace('T', ' ')}</span>
+                      </div>
+                    </div>
+                    <div className={`text-base font-bold ml-3 ${amt >= 0 ? 'text-amber-600' : 'text-red-500'}`}>
+                      {amt > 0 ? '+' : ''}{amt}
                     </div>
                   </div>
-                  <div className={`text-base font-bold ml-3 ${amt >= 0 ? 'text-amber-600' : 'text-red-500'}`}>
-                    {amt > 0 ? '+' : ''}{amt}
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusCfg.cls}`}>
+                      {statusCfg.label}
+                    </span>
                   </div>
                 </div>
                 );
@@ -234,9 +280,11 @@ export default function MyPoints() {
         </div>
       )}
 
-      {/* ── Installer: Delivery Points View ── */}
+      {/* ═══════════════════════════════════ */}
+      {/* ── Installer: Delivery Points ── */}
+      {/* ═══════════════════════════════════ */}
       {isInstaller && (
-      <div className="px-4 -mt-2 relative z-10">
+      <div className="px-4 mt-3">
         <div className="bg-white rounded-2xl shadow-card p-4 mb-4">
           <div className="flex items-center gap-2 mb-3">
             <Award size={18} className="text-warm-500" />
@@ -260,7 +308,7 @@ export default function MyPoints() {
           <p className="text-[10px] text-surface-400 mt-1.5">待门店确认后发放现金奖励</p>
         </div>
 
-        <h3 className="text-sm font-semibold text-gray-900 mb-3">奖励明细</h3>
+        <h3 className="text-sm font-semibold text-gray-900 mb-3">交付积分明细</h3>
         <div className="space-y-2">
           {deliveryRecords.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-surface-400">
@@ -277,12 +325,11 @@ export default function MyPoints() {
                     <span className={`text-xs font-medium ${record.type === 'featured_photo' ? 'text-amber-500' : 'text-green-600'}`}>
                       {record.type === 'featured_photo' ? '精选案例' : '合格照片'}
                     </span>
-                    <span className="text-xs text-surface-400">{record.createdAt}</span>
+                    <span className="text-xs text-surface-400">{record.createdAt.slice(0, 10)}</span>
                   </div>
                 </div>
                 <div className="text-right ml-3">
                   <div className="text-base font-bold text-green-600">+{record.points}</div>
-                  <div className="text-[10px] text-surface-400">¥{record.rewardAmount}</div>
                 </div>
               </div>
             ))
@@ -291,11 +338,13 @@ export default function MyPoints() {
       </div>
       )}
 
-      {/* ── Points View ── */}
+      {/* ═══════════════════════════════════ */}
+      {/* ── 积分明细 (非安装师傅) ── */}
+      {/* ═══════════════════════════════════ */}
       {!isInstaller && viewTab === 'points' && (
       <>
       {/* ── Ranking Card ── */}
-      <div className="px-4 -mt-2 relative z-10">
+      <div className="px-4 mt-3">
         <div className="bg-white rounded-2xl shadow-card overflow-hidden">
           <div className="category-tabs flex gap-1 px-3 py-3 no-scrollbar border-b border-surface-100">
             {rankTabs.map((tab) => (
@@ -323,35 +372,51 @@ export default function MyPoints() {
                   </p>
                   {item.userTitle && <p className="text-xs text-surface-400">{item.userTitle}</p>}
                 </div>
-                <div className="text-sm font-bold text-gray-900">{item.points}</div>
+                <div className="text-sm font-bold text-gray-900">{item.points} 积分</div>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* ── Points History ── */}
+      {/* ── 积分明细列表 ── */}
       <div className="px-4 mt-5">
         <h3 className="text-sm font-semibold text-gray-900 mb-3">积分明细</h3>
-        <div className="space-y-2">
-          {allPointRecords.map((record) => {
-            const typeConfig = pointTypeConfig[record.type] || { label: record.type, color: 'text-gray-600' };
-            return (
-              <div key={record.id} className="bg-white rounded-xl px-4 py-3 flex items-center justify-between shadow-card">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-700 truncate">{record.description}</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className={`text-xs font-medium ${typeConfig.color}`}>{typeConfig.label}</span>
-                    <span className="text-xs text-surface-400">{record.createdAt}</span>
+        {allPointRecords.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 text-surface-400">
+            <Trophy size={40} strokeWidth={1} className="mb-3" />
+            <p className="text-sm">暂无积分记录</p>
+            <p className="text-xs mt-1">完成每日任务、上传案例可获得积分</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {allPointRecords.map((record) => {
+              const typeCfg = pointTypeConfig[record.type] || { label: record.type, color: 'text-gray-600' };
+              const statusCfg = pointStatusConfig[record.status || 'credited'];
+              return (
+                <div key={record.id} className="bg-white rounded-xl px-4 py-3 shadow-card">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-700 truncate">{record.description}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className={`text-[10px] font-medium ${typeCfg.color}`}>{typeCfg.label}</span>
+                        <span className="text-xs text-surface-400">{record.createdAt.slice(0, 10)}</span>
+                      </div>
+                    </div>
+                    <div className={`text-base font-bold ml-3 ${record.points > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      {record.points > 0 ? '+' : ''}{record.points}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusCfg.cls}`}>
+                      {statusCfg.label}
+                    </span>
                   </div>
                 </div>
-                <div className={`text-base font-bold ml-3 ${record.points > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                  {record.points > 0 ? '+' : ''}{record.points}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
       </>
       )}

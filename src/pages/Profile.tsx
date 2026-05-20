@@ -34,10 +34,10 @@ export default function Profile() {
     () => allPointRecords.reduce((sum, r) => sum + r.points, 0),
     [allPointRecords]
   );
-  const monthPoints = useMemo(
-    () => allPointRecords.filter(r => r.createdAt.startsWith('2026-05')).reduce((sum, r) => sum + r.points, 0),
-    [allPointRecords]
-  );
+  const monthPoints = useMemo(() => {
+    const month = new Date().toISOString().slice(0, 7);
+    return allPointRecords.filter(r => r.createdAt.startsWith(month)).reduce((sum, r) => sum + r.points, 0);
+  }, [allPointRecords]);
   const caseCoinBalance = useMemo(() => getCaseCoinBalance(uid), [uid]);
 
   const rankData = rankTab === 'sales' ? mockSalesRank :
@@ -105,26 +105,33 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* ── Points Card ── */}
+      {/* ── 积分统计栏 ── */}
       <div className="px-4 -mt-4 relative z-10">
-        <div className="glass-card px-4 py-4">
+        <button
+          onClick={() => navigate('/my-points')}
+          className="glass-card px-4 py-4 w-full text-left active:opacity-80 transition-opacity"
+        >
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <div className="text-white text-xl font-bold">{totalPoints}</div>
-              <div className="text-blue-200/60 text-[10px] mt-0.5">当前积分</div>
+              <div className="text-navy-800 text-xl font-bold">{totalPoints}</div>
+              <div className="text-surface-500 text-[10px] mt-0.5">当前积分</div>
             </div>
             <div>
-              <div className="text-white text-xl font-bold">{monthPoints}</div>
-              <div className="text-blue-200/60 text-[10px] mt-0.5">本月积分</div>
+              <div className="text-navy-800 text-xl font-bold">{monthPoints}</div>
+              <div className="text-surface-500 text-[10px] mt-0.5">本月积分</div>
             </div>
             <div>
-              <div className="text-white text-xl font-bold">
+              <div className="text-navy-800 text-xl font-bold">
                 {myRank > 0 ? `#${myRank}` : '-'}
               </div>
-              <div className="text-blue-200/60 text-[10px] mt-0.5">排名</div>
+              <div className="text-surface-500 text-[10px] mt-0.5">排名</div>
             </div>
           </div>
-        </div>
+          <div className="flex items-center justify-center gap-1 mt-2 text-[10px] text-surface-400">
+            <span>查看积分明细</span>
+            <ChevronRight size={12} />
+          </div>
+        </button>
       </div>
 
       {/* ── Installer: Delivery Reward Card ── */}
@@ -193,11 +200,11 @@ export default function Profile() {
       </div>
       )}
 
-      {/* ── Case Coin Balance ── */}
+      {/* ── 案例币余额 ── */}
       {!isInstaller && !isAdmin && (
       <div className="px-4 mt-3">
         <button
-          onClick={() => navigate('/my-points')}
+          onClick={() => navigate('/my-points?tab=coins')}
           className="w-full bg-white rounded-2xl shadow-card overflow-hidden active:bg-surface-50 transition-colors"
         >
           <div className="flex items-center justify-between px-4 py-3.5">
@@ -207,12 +214,12 @@ export default function Profile() {
               </div>
               <div>
                 <span className="text-sm font-medium text-gray-700">案例币余额</span>
-                <p className="text-[10px] text-surface-400">上传真实案例获得案例币，用于交换保存其他客户案例高清图</p>
+                <p className="text-[10px] text-surface-400">上传并通过审核的案例可获得案例币奖励</p>
               </div>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="text-lg font-bold text-amber-600">{caseCoinBalance}</span>
-              <span className="text-xs text-surface-400">币</span>
+              <span className="text-xs text-surface-400">案例币</span>
               <ChevronRight size={16} className="text-surface-300" />
             </div>
           </div>
@@ -363,7 +370,7 @@ export default function Profile() {
                   </p>
                   {item.userTitle && <p className="text-xs text-surface-400">{item.userTitle}</p>}
                 </div>
-                <div className="text-sm font-bold text-gray-900">{item.points}</div>
+                <div className="text-sm font-bold text-gray-900">{item.points} 积分</div>
               </div>
             );
           })}

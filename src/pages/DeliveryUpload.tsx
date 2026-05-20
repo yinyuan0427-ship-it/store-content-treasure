@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth, useToast } from '../App';
 import { getAllDeliveryTasks, updateDeliveryTask, getInstallerByUserId } from '../mock/data';
-import { ArrowLeft, Camera, Send, ShieldCheck, CheckCircle2, AlertTriangle, X, Plus, Upload } from 'lucide-react';
+import { ArrowLeft, Camera, Send, ShieldCheck, CheckCircle2, AlertTriangle, X, Plus } from 'lucide-react';
 
 const installStatuses = [
   { key: 'completed', label: '已完成安装' },
@@ -34,6 +34,7 @@ export default function DeliveryUpload() {
   const [status, setStatus] = useState('');
   const [note, setNote] = useState('');
   const [privacyConfirmed, setPrivacyConfirmed] = useState(false);
+  const isRejected = task?.reviewStatus === 'rejected';
 
   if (!task) {
     return (
@@ -91,6 +92,8 @@ export default function DeliveryUpload() {
       installStatus: status as any,
       installNote: note.trim(),
       reviewStatus: 'photos_uploaded',
+      reviewNote: '',
+      dupRefTaskId: undefined,
       privacyChecks: {
         hasFace: false,
         hasDoorNumber: false,
@@ -101,8 +104,8 @@ export default function DeliveryUpload() {
         hasClutteredScene: false,
       },
     });
-    showToast('照片提交成功！销售将补充成交故事');
-    setTimeout(() => navigate('/delivery/tasks'), 800);
+    showToast(isRejected ? '补拍照片提交成功，等待重新审核' : '照片提交成功！销售将补充成交故事');
+    setTimeout(() => navigate(`/delivery/detail/${task.id}`, { replace: true }), 800);
   };
 
   return (
@@ -113,12 +116,23 @@ export default function DeliveryUpload() {
           <ArrowLeft size={22} />
         </button>
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">上传安装照片</h1>
+          <h1 className="text-lg font-semibold text-gray-900">{isRejected ? '重新上传安装照片' : '上传安装照片'}</h1>
           <p className="text-xs text-gray-400">案例 #{task.id.toUpperCase()} · {task.model}</p>
         </div>
       </div>
 
       <div className="px-4 py-4 space-y-5 pb-6">
+        {isRejected && task.reviewNote && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <AlertTriangle size={16} className="text-red-500" />
+              <p className="text-sm font-semibold text-red-700">本次需要补拍重提</p>
+            </div>
+            <p className="text-sm text-red-700 leading-relaxed">{task.reviewNote}</p>
+            <p className="text-xs text-red-500 mt-2">请重新选择干净照片，提交后会替换旧照片并进入重新审核。</p>
+          </div>
+        )}
+
         {/* Upload Requirements */}
         <div className="bg-navy-50 border border-navy-200 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-2">
@@ -253,7 +267,7 @@ export default function DeliveryUpload() {
         <button onClick={handleSubmit}
           className="w-full h-12 bg-primary-600 text-white font-semibold rounded-xl text-base active:bg-primary-700 transition-colors shadow-lg shadow-primary-200 flex items-center justify-center gap-2">
           <Send size={18} />
-          提交照片
+          {isRejected ? '提交补拍照片' : '提交照片'}
         </button>
       </div>
     </div>

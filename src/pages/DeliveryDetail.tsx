@@ -13,6 +13,7 @@ export default function DeliveryDetail() {
   const { showToast } = useToast();
   const { toggleFavorite, isFavorited } = useFavorites();
   const [copyModalText, setCopyModalText] = useState('');
+  const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
 
   const task = getAllDeliveryTasks().find(t => t.id === taskId);
 
@@ -82,7 +83,13 @@ export default function DeliveryDetail() {
 
   const isSales = user?.role === 'sales';
   const canUploadPhoto = isInstaller && task.installImages.length === 0;
-  const canAddStory = (isSales || user?.role === 'dealer_owner' || user?.role === 'admin') && task.installImages.length > 0 && !task.storyWhy;
+  const canEditStory = (isSales || user?.role === 'dealer_owner' || user?.role === 'admin') && task.installImages.length > 0;
+  const canAddStory = canEditStory && !task.storyWhy;
+  const canReuploadCleanPhotos = isInstaller && (
+    task.reviewStatus === 'rejected' ||
+    task.reviewStatus === 'suspected_dup' ||
+    task.reviewStatus === 'confirmed_dup'
+  );
 
   return (
     <div className="min-h-screen bg-surface-50 flex flex-col">
@@ -138,11 +145,21 @@ export default function DeliveryDetail() {
             <>
             <div className="grid grid-cols-3 gap-2">
               {task.installImages.map((img, i) => (
-                <div key={i} className="aspect-square rounded-xl overflow-hidden">
-                  <img src={img} alt={`安装图${i + 1}`} className="w-full h-full object-cover" />
-                </div>
+                <button
+                  key={i}
+                  onClick={() => setPreviewImageIndex(i)}
+                  className="aspect-square rounded-xl overflow-hidden bg-surface-100 active:opacity-80"
+                >
+                  <img
+                    src={img}
+                    alt={`安装图${i + 1}`}
+                    className="w-full h-full object-cover"
+                    style={{ WebkitTouchCallout: 'default', WebkitUserSelect: 'auto', userSelect: 'auto' }}
+                  />
+                </button>
               ))}
             </div>
+            <p className="text-[10px] text-surface-400 mt-2">点击图片查看大图，手机上长按大图可保存到相册</p>
             {isInstaller && (
               <div className="mt-3 p-3 rounded-xl text-sm font-medium text-center
                 {task.reviewStatus === 'featured' ? 'bg-warm-50 text-warm-700 border border-warm-200' :
@@ -180,12 +197,22 @@ export default function DeliveryDetail() {
         </div>
 
         {/* Sales Story */}
-        {!isInstaller && (task.storyWhy || canAddStory) && (
+        {!isInstaller && (task.storyWhy || canEditStory) && (
           <div className="bg-white rounded-2xl p-4 shadow-card">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
-              <PenLine size={16} />
-              成交故事
-            </h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                <PenLine size={16} />
+                成交故事
+              </h3>
+              {task.storyWhy && canEditStory && (
+                <button
+                  onClick={() => navigate(`/delivery/story/${task.id}`)}
+                  className="text-xs text-navy-700 font-medium bg-navy-50 px-3 py-1.5 rounded-full active:bg-navy-100 transition-colors"
+                >
+                  编辑
+                </button>
+              )}
+            </div>
             {task.storyWhy ? (
               <div className="space-y-3 text-sm">
                 <div>
@@ -204,10 +231,12 @@ export default function DeliveryDetail() {
                     <p className="text-gray-700">{task.storyReason}</p>
                   </div>
                 )}
-                <div>
-                  <p className="text-xs text-surface-400 mb-1">客户反馈</p>
-                  <p className="text-gray-700">{task.storyFeedback}</p>
-                </div>
+                {task.storyFeedback && (
+                  <div>
+                    <p className="text-xs text-surface-400 mb-1">客户反馈</p>
+                    <p className="text-gray-700">{task.storyFeedback}</p>
+                  </div>
+                )}
                 {user?.role === 'admin' && task.storyPublic && (
                   <span className={`inline-block text-xs px-2 py-1 rounded-full ${
                     task.storyPublic === '适合公开传播' ? 'bg-green-50 text-green-600' : 'bg-surface-50 text-surface-500'
@@ -217,7 +246,16 @@ export default function DeliveryDetail() {
             ) : (
               <div className="text-center py-6 text-surface-400 text-sm">
                 <PenLine size={32} className="mx-auto mb-2" strokeWidth={1} />
-                <p>等待销售补充成交故事</p>
+                <p className="mb-3">等待销售补充成交故事</p>
+                {canEditStory && (
+                  <button
+                    onClick={() => navigate(`/delivery/story/${task.id}`)}
+                    className="h-10 px-5 bg-navy-800 text-white font-semibold rounded-xl text-sm active:bg-navy-900 transition-colors inline-flex items-center justify-center gap-1.5"
+                  >
+                    <PenLine size={15} />
+                    补充成交故事
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -390,7 +428,7 @@ export default function DeliveryDetail() {
       </div>
 
       {/* Bottom Actions */}
-      {(!isInstaller || task.installImages.length === 0 || task.reviewStatus === 'rejected') && (
+      {(!isInstaller || task.installImages.length === 0 || task.reviewStatus === 'rejected' || task.reviewStatus === 'suspected_dup' || task.reviewStatus === 'confirmed_dup') && (
       <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-app bg-white/95 backdrop-blur border-t border-surface-100 z-40 safe-bottom">
         <div className="flex items-center gap-2 px-4 py-3">
           {!isInstaller && (
@@ -415,11 +453,11 @@ export default function DeliveryDetail() {
               上传安装照片
             </button>
           )}
-          {isInstaller && task.reviewStatus === 'rejected' && (
+          {canReuploadCleanPhotos && (
             <button onClick={() => navigate(`/delivery/upload/${task.id}`)}
               className="flex-1 h-11 bg-navy-800 text-white font-semibold rounded-xl text-sm active:bg-navy-900 transition-colors flex items-center justify-center gap-1.5">
               <Camera size={15} />
-              重新上传照片
+              重新上传干净照片
             </button>
           )}
           {!isInstaller && canAddStory && (
@@ -442,6 +480,44 @@ export default function DeliveryDetail() {
 
       {copyModalText && (
         <CopyModal text={copyModalText} onClose={() => setCopyModalText('')} />
+      )}
+
+      {previewImageIndex !== null && task.installImages[previewImageIndex] && (
+        <div className="fixed inset-0 z-[80] bg-black flex flex-col">
+          <div className="flex items-center justify-between px-4 pt-12 pb-3 text-white/80">
+            <button onClick={() => setPreviewImageIndex(null)} className="text-sm flex items-center gap-1">
+              <ArrowLeft size={18} />
+              返回
+            </button>
+            <span className="text-sm">第 {previewImageIndex + 1} 张 / 共 {task.installImages.length} 张</span>
+            <div className="w-12" />
+          </div>
+          <div className="flex-1 overflow-y-auto px-3 pb-6">
+            <img
+              src={task.installImages[previewImageIndex]}
+              alt={`安装大图${previewImageIndex + 1}`}
+              className="w-full h-auto rounded-xl"
+              style={{ WebkitTouchCallout: 'default', WebkitUserSelect: 'auto', userSelect: 'auto' }}
+            />
+            <p className="text-white/70 text-xs text-center mt-3">手机上长按图片，选择保存到相册</p>
+            {task.installImages.length > 1 && (
+              <div className="flex gap-2 mt-4">
+                <button
+                  onClick={() => setPreviewImageIndex((previewImageIndex - 1 + task.installImages.length) % task.installImages.length)}
+                  className="flex-1 h-10 rounded-xl bg-white/10 text-white text-sm active:bg-white/15"
+                >
+                  上一张
+                </button>
+                <button
+                  onClick={() => setPreviewImageIndex((previewImageIndex + 1) % task.installImages.length)}
+                  className="flex-1 h-10 rounded-xl bg-white/10 text-white text-sm active:bg-white/15"
+                >
+                  下一张
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

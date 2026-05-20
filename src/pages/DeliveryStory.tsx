@@ -11,10 +11,13 @@ export default function DeliveryStory() {
 
   const task = getAllDeliveryTasks().find(t => t.id === taskId);
 
-  const [storyWhy, setStoryWhy] = useState(task?.storyWhy || '');
-  const [storyFocus, setStoryFocus] = useState(task?.storyFocus || '');
-  const [storyReason, setStoryReason] = useState(task?.storyReason || '');
-  const [storyFeedback, setStoryFeedback] = useState(task?.storyFeedback || '');
+  const initialStoryText = [
+    task?.storyWhy,
+    task?.storyFocus,
+    task?.storyReason,
+    task?.storyFeedback,
+  ].filter(Boolean).join('\n\n');
+  const [storyText, setStoryText] = useState(initialStoryText);
 
   if (!task) {
     return (
@@ -28,19 +31,18 @@ export default function DeliveryStory() {
   }
 
   const handleSubmit = () => {
-    if (!storyWhy.trim()) { showToast('请填写客户为什么选择了我们'); return; }
-    if (!storyFeedback.trim()) { showToast('请填写客户的评价或感受'); return; }
+    if (!storyText.trim()) { showToast('请填写成交故事'); return; }
 
     showToast('成交故事提交成功！等待管理员审核');
     updateDeliveryTask(task.id, {
-      storyWhy: storyWhy.trim(),
-      storyFocus: storyFocus.trim(),
-      storyReason: storyReason.trim(),
-      storyFeedback: storyFeedback.trim(),
+      storyWhy: storyText.trim(),
+      storyFocus: '',
+      storyReason: '',
+      storyFeedback: '',
       storyPublic: '适合公开传播',
       reviewStatus: 'story_done',
     });
-    setTimeout(() => navigate('/delivery'), 800);
+    setTimeout(() => navigate(`/delivery/detail/${task.id}`, { replace: true }), 800);
   };
 
   return (
@@ -52,7 +54,7 @@ export default function DeliveryStory() {
           </svg>
         </button>
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">补充成交故事</h1>
+          <h1 className="text-lg font-semibold text-gray-900">{task.storyWhy ? '编辑成交故事' : '补充成交故事'}</h1>
           <p className="text-xs text-gray-400">{task.customerAlias} · {task.model} · {task.salesName}</p>
         </div>
       </div>
@@ -72,41 +74,19 @@ export default function DeliveryStory() {
           </div>
         )}
 
-        <div className="bg-white rounded-xl p-4 shadow-sm space-y-4">
-          {/* Why buy */}
+        <div className="bg-white rounded-xl p-4 shadow-sm">
           <div>
             <label className="text-sm font-semibold text-gray-700 mb-1.5 block">
-              客户为什么选择了我们？ <span className="text-red-400">*</span>
+              成交故事 <span className="text-red-400">*</span>
             </label>
-            <textarea value={storyWhy} onChange={(e) => setStoryWhy(e.target.value)}
-              placeholder="描述客户来店里的过程、试躺体验、对比了哪些品牌..."
-              rows={3} className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:border-primary-400 transition-colors" />
-          </div>
-
-          {/* Focus */}
-          <div>
-            <label className="text-sm font-semibold text-gray-700 mb-1.5 block">客户比较在意哪些方面？</label>
-            <textarea value={storyFocus} onChange={(e) => setStoryFocus(e.target.value)}
-              placeholder="如：支撑性、透气性、性价比、品牌口碑..."
-              rows={2} className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:border-primary-400 transition-colors" />
-          </div>
-
-          {/* Reason */}
-          <div>
-            <label className="text-sm font-semibold text-gray-700 mb-1.5 block">为什么最终选了这款产品？</label>
-            <textarea value={storyReason} onChange={(e) => setStoryReason(e.target.value)}
-              placeholder="描述客户为什么最终选了这款产品..."
-              rows={2} className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:border-primary-400 transition-colors" />
-          </div>
-
-          {/* Feedback */}
-          <div>
-            <label className="text-sm font-semibold text-gray-700 mb-1.5 block">
-              客户的评价或感受 <span className="text-red-400">*</span>
-            </label>
-            <textarea value={storyFeedback} onChange={(e) => setStoryFeedback(e.target.value)}
-              placeholder="送货后客户的反馈、评价、感受..."
-              rows={3} className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:border-primary-400 transition-colors" />
+            <textarea
+              value={storyText}
+              onChange={(e) => setStoryText(e.target.value)}
+              placeholder="简单写清楚客户怎么来的、为什么选这款、安装后有什么反馈。比如：客户之前睡硬床垫腰不舒服，到店试了两次，最后选了芸枫。送货后说支撑感比原来的好，次卧也睡得舒服。"
+              rows={8}
+              className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:border-primary-400 transition-colors leading-relaxed"
+            />
+            <p className="text-[10px] text-gray-400 mt-1.5">不用分点，像给同事讲这个客户为什么成交一样写即可。</p>
           </div>
         </div>
 
@@ -117,7 +97,7 @@ export default function DeliveryStory() {
 
         <button onClick={handleSubmit}
           className="w-full h-12 bg-primary-600 text-white font-semibold rounded-xl text-base active:bg-primary-700 transition-colors shadow-lg shadow-primary-200">
-          <PenLine size={16} className="inline mr-1" />提交案例故事
+          <PenLine size={16} className="inline mr-1" />{task.storyWhy ? '保存成交故事' : '提交案例故事'}
         </button>
       </div>
     </div>

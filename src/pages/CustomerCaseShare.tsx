@@ -104,9 +104,9 @@ export default function CustomerCaseShare() {
 
       {/* ── Content ── */}
       <div className="flex-1 px-5 pt-5 pb-32 space-y-5">
-        {/* Store & location */}
+        {/* Service & location */}
         <div className="flex items-center gap-2 text-sm text-surface-500">
-          <div className="flex items-center gap-1"><Store size={14} /><span>{task.storeName}</span></div>
+          <div className="flex items-center gap-1"><Store size={14} /><span>本地服务</span></div>
           <span>·</span>
           <div className="flex items-center gap-1"><MapPin size={14} /><span>{task.city}{task.district ? ` ${task.district}` : ''}</span></div>
         </div>
@@ -230,15 +230,15 @@ export default function CustomerCaseShare() {
           )}
         </div>
 
-        {/* Store trust */}
+        {/* Service trust */}
         <div className="bg-surface-50 rounded-2xl p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
-            <Store size={16} className="text-navy-600" />{task.storeName}
+            <Store size={16} className="text-navy-600" />本地门店服务
           </h2>
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2">
               <MapPin size={14} className="text-surface-400 flex-shrink-0" />
-              <span className="text-surface-600">{task.city}{task.district ? ` ${task.district}` : ''}</span>
+              <span className="text-surface-600">支持预约到店体验</span>
             </div>
             <div className="flex items-center gap-2">
               <Star size={14} className="text-warm-400 flex-shrink-0" fill="#f5a932" />
@@ -250,7 +250,7 @@ export default function CustomerCaseShare() {
             </div>
           </div>
           <p className="text-xs text-surface-400 mt-3 leading-relaxed">
-            到店可免费体验多款产品，专业睡眠顾问一对一服务
+            可预约到店免费体验多款产品，专业睡眠顾问一对一服务
           </p>
         </div>
 
@@ -258,7 +258,7 @@ export default function CustomerCaseShare() {
         <div className="bg-surface-50 rounded-xl p-3 flex items-start gap-2">
           <Shield size={14} className="text-surface-400 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-surface-400 leading-relaxed">
-            本案例为真实门店交付案例，隐私信息已脱敏处理。{task.storeName}真实案例。
+            本案例为真实门店交付案例，隐私信息已脱敏处理。
           </p>
         </div>
       </div>
@@ -364,7 +364,6 @@ function ContactAdvisorSheet({
               <div className="flex justify-between"><span className="text-surface-400">产品系列</span><span className="font-medium text-gray-800">{task.productSeries}</span></div>
             )}
             <div className="flex justify-between"><span className="text-surface-400">城市</span><span className="font-medium text-gray-800">{task.city}</span></div>
-            <div className="flex justify-between"><span className="text-surface-400">门店</span><span className="font-medium text-gray-800">{task.storeName}</span></div>
             {(salesId || task.salesId) && (
               <div className="flex justify-between"><span className="text-surface-400">专属顾问</span><span className="font-medium text-gray-800">{task.salesName}</span></div>
             )}
@@ -488,10 +487,6 @@ function LeadFormModal({
               {task.salesName} 会尽快联系您
             </p>
             <div className="mt-3 bg-surface-50 rounded-xl p-3 text-left">
-              <div className="flex items-center gap-2 mb-1">
-                <Store size={14} className="text-surface-400" />
-                <span className="text-xs text-surface-600">{task.storeName}</span>
-              </div>
               <div className="flex items-center gap-2">
                 <MapPin size={14} className="text-surface-400" />
                 <span className="text-xs text-surface-600">{task.city}</span>
