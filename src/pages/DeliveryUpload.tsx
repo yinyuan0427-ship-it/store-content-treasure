@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth, useToast } from '../App';
-import { getAllDeliveryTasks, updateDeliveryTask, getInstallerByUserId } from '../mock/data';
+import { getAllDeliveryTasks, updateDeliveryTask, getInstallerByUserId, getSalesByUserId } from '../mock/data';
 import { ArrowLeft, Camera, Send, ShieldCheck, CheckCircle2, AlertTriangle, X, Plus } from 'lucide-react';
 
 const installStatuses = [
@@ -47,20 +47,36 @@ export default function DeliveryUpload() {
     );
   }
 
-  const isInstaller = user?.role === 'installer';
-  const installerId = isInstaller ? getInstallerByUserId(user?.phone || '')?.id || null : null;
-  if (isInstaller && task.installerId !== installerId) {
+  const isAssignedInstaller =
+    user?.role === 'installer' &&
+    !!task.installerId &&
+    getInstallerByUserId(user?.phone || '')?.id === task.installerId;
+
+  const currentSalesId = user?.role === 'sales'
+    ? getSalesByUserId(user?.phone || '')?.id || ''
+    : '';
+  const isOwnerSales = user?.role === 'sales' && currentSalesId === task.salesId;
+
+  const canUploadCasePhotos =
+    isAssignedInstaller ||
+    isOwnerSales ||
+    user?.role === 'dealer_owner' ||
+    user?.role === 'admin';
+
+  if (!canUploadCasePhotos) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center px-6">
-          <AlertTriangle size={40} strokeWidth={1} className="mx-auto mb-3 text-amber-500" />
-          <p className="text-gray-700 font-medium mb-1">无权访问该任务</p>
-          <p className="text-sm text-gray-400 mb-4">你只能查看自己被分配的安装任务</p>
-          <button onClick={() => navigate('/delivery/tasks', { replace: true })} className="text-navy-700 font-medium text-sm">返回交付任务</button>
+          <ShieldCheck size={40} strokeWidth={1} className="mx-auto mb-3 text-surface-400" />
+          <p className="text-gray-700 font-medium mb-1">无权上传该案例照片</p>
+          <p className="text-sm text-gray-400 mb-4">只能上传自己名下或已分配给你的案例照片</p>
+          <button onClick={() => navigate(-1)} className="text-navy-700 font-medium text-sm">返回</button>
         </div>
       </div>
     );
   }
+
+  const isInstallerTask = !!task.installerId;
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -83,13 +99,13 @@ export default function DeliveryUpload() {
   };
 
   const handleSubmit = () => {
-    if (images.length === 0) { showToast('请至少上传一张安装照片'); return; }
-    if (!status) { showToast('请选择安装状态'); return; }
+    if (images.length === 0) { showToast('请至少上传一张案例照片'); return; }
+    if (isInstallerTask && !status) { showToast('请选择安装状态'); return; }
     if (!privacyConfirmed) { showToast('请确认照片中未包含客户隐私信息'); return; }
 
     updateDeliveryTask(task.id, {
       installImages: images,
-      installStatus: status as any,
+      installStatus: isInstallerTask ? (status as any) : 'completed',
       installNote: note.trim(),
       reviewStatus: 'photos_uploaded',
       reviewNote: '',
@@ -104,7 +120,7 @@ export default function DeliveryUpload() {
         hasClutteredScene: false,
       },
     });
-    showToast(isRejected ? '补拍照片提交成功，等待重新审核' : '照片提交成功！销售将补充成交故事');
+    showToast(isRejected ? '补拍照片提交成功，等待重新审核' : isInstallerTask ? '照片提交成功！销售将补充成交故事' : '案例照片提交成功，请补充成交故事');
     setTimeout(() => navigate(`/delivery/detail/${task.id}`, { replace: true }), 800);
   };
 
@@ -116,7 +132,7 @@ export default function DeliveryUpload() {
           <ArrowLeft size={22} />
         </button>
         <div>
-          <h1 className="text-lg font-semibold text-gray-900">{isRejected ? '重新上传安装照片' : '上传安装照片'}</h1>
+          <h1 className="text-lg font-semibold text-gray-900">{isRejected ? '重新上传安装照片' : isInstallerTask ? '上传安装照片' : '上传案例照片'}</h1>
           <p className="text-xs text-gray-400">案例 #{task.id.toUpperCase()} · {task.model}</p>
         </div>
       </div>
@@ -140,7 +156,7 @@ export default function DeliveryUpload() {
             <p className="text-sm font-semibold text-navy-700">上传要求</p>
           </div>
           <div className="space-y-1 text-xs text-navy-600">
-            <p>· 必须为自己门店真实交付照片</p>
+            <p>· 必须为自己门店真实案例照片</p>
             <p>· 不得上传其他导购/其他门店案例照片</p>
             <p>· 不得包含第三方水印或平台截图水印</p>
             <p>· 不得包含客户隐私信息</p>
@@ -172,7 +188,7 @@ export default function DeliveryUpload() {
           <div className="flex items-center gap-1.5 mb-3">
             <Camera size={16} className="text-gray-600" />
             <span className="text-sm font-semibold text-gray-700">
-              安装照片 <span className="text-red-400">*</span>
+              {isInstallerTask ? '安装照片' : '案例照片'} <span className="text-red-400">*</span>
             </span>
             <span className="text-xs text-gray-400 font-normal ml-2">最多 9 张</span>
           </div>
@@ -238,7 +254,8 @@ export default function DeliveryUpload() {
           )}
         </div>
 
-        {/* Install Status */}
+        {/* Install Status — only for installer tasks */}
+        {isInstallerTask && (
         <div className="bg-white rounded-xl p-4 shadow-card">
           <div className="flex items-center gap-1.5 mb-3">
             <CheckCircle2 size={16} className="text-gray-600" />
@@ -255,6 +272,7 @@ export default function DeliveryUpload() {
             ))}
           </div>
         </div>
+        )}
 
         {/* Note */}
         <div className="bg-white rounded-xl p-4 shadow-card">
@@ -267,7 +285,7 @@ export default function DeliveryUpload() {
         <button onClick={handleSubmit}
           className="w-full h-12 bg-primary-600 text-white font-semibold rounded-xl text-base active:bg-primary-700 transition-colors shadow-lg shadow-primary-200 flex items-center justify-center gap-2">
           <Send size={18} />
-          {isRejected ? '提交补拍照片' : '提交照片'}
+          {isRejected ? '提交补拍照片' : isInstallerTask ? '提交照片' : '提交案例照片'}
         </button>
       </div>
     </div>

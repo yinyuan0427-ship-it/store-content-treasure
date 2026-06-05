@@ -1,7 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { useAuth } from '../App';
 import { useNavigate } from 'react-router-dom';
-import { Store, Briefcase, Truck, LogIn } from 'lucide-react';
+import { Store, Briefcase, Truck, UserPlus, LogIn } from 'lucide-react';
 
 export default function Login() {
   const [phone, setPhone] = useState('');
@@ -11,13 +11,13 @@ export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
     if (!phone.trim() || !password.trim()) { setError('请输入账号和密码'); return; }
     setLoading(true);
-    setTimeout(() => {
-      const ok = login(phone.trim(), password);
+    window.setTimeout(async () => {
+      const ok = await login(phone.trim(), password);
       setLoading(false);
       if (ok) navigate('/', { replace: true });
       else setError('账号或密码错误');
@@ -81,6 +81,10 @@ export default function Login() {
             <button onClick={() => { setPhone('sales001'); setPassword('123456'); }}
               className="w-full text-left text-xs text-surface-500 hover:text-navy-700 transition-colors py-1 rounded-lg px-2 hover:bg-surface-100">
               <Briefcase size={12} className="inline mr-1.5" />销售：sales001 / 123456
+            </button>
+            <button onClick={() => { setPhone('sales003'); setPassword('123456'); }}
+              className="w-full text-left text-xs text-surface-500 hover:text-navy-700 transition-colors py-1 rounded-lg px-2 hover:bg-surface-100">
+              <UserPlus size={12} className="inline mr-1.5" />空白导购：sales003 / 123456
             </button>
             <button onClick={() => { setPhone('installer001'); setPassword('123456'); }}
               className="w-full text-left text-xs text-surface-500 hover:text-navy-700 transition-colors py-1 rounded-lg px-2 hover:bg-surface-100">

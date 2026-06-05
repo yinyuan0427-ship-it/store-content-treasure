@@ -1,39 +1,13 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast, useAuth } from '../App';
-import { getAllDeliveryTasks, loadShareLeads, mockLeads, mockPublicCases, Lead } from '../mock/data';
-import { Mail, FileText, Users, UserCheck, Store, CheckCircle2 } from 'lucide-react';
+import { getAllDeliveryTasks, mockPublicCases } from '../mock/data';
+import { getAllManagedLeads, LEAD_STATUS_OPTIONS, updateStoredShareLead } from '../utils/leads';
+import type { LeadStatus, ManagedLead } from '../utils/leads';
+import { Mail, FileText } from 'lucide-react';
 
-const statusOptions = ['待联系', '已联系', '已到店', '已成交', '无效', '暂不考虑'] as const;
+const statusOptions = LEAD_STATUS_OPTIONS;
 const filterTabs = ['全部', '待联系', '已联系', '已到店', '已成交'];
-
-function loadStoredLeads(): Lead[] {
-  try {
-    const parsed = loadShareLeads();
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map((item: any, i: number) => {
-      const sourceCase = getAllDeliveryTasks().find(t => t.id === item.sourceCaseId)
-        || mockPublicCases.find(c => c.id === item.sourceCaseId);
-      return {
-        id: `share-${i}`,
-        customerAlias: item.alias || '',
-        phone: item.phone || '',
-        city: item.city || sourceCase?.city || '',
-        interestedProduct: item.interestProduct || '',
-        interestType: item.interestType || '',
-        sourceCaseId: item.sourceCaseId || '',
-        sourceStoreId: item.sourceStoreId || sourceCase?.storeId,
-        sourceStoreName: item.sourceStoreName || sourceCase?.storeName,
-        sourceSalesId: item.sourceSalesId,
-        remark: item.remark,
-        status: '待联系' as const,
-        createdAt: item.createdAt || '',
-      };
-    });
-  } catch {
-    return [];
-  }
-}
 
 export default function AdminLeads() {
   const navigate = useNavigate();
@@ -42,15 +16,7 @@ export default function AdminLeads() {
   const [activeTab, setActiveTab] = useState('全部');
   const [selectedLead, setSelectedLead] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
-
-  const allLeads = useMemo(() => {
-    const stored = loadStoredLeads();
-    // Sort by createdAt descending (newest first)
-    const sorted = [...stored, ...mockLeads].sort((a, b) =>
-      b.createdAt.localeCompare(a.createdAt)
-    );
-    return sorted;
-  }, []);
+  const [allLeads, setAllLeads] = useState<ManagedLead[]>(() => getAllManagedLeads(user));
 
   const filtered = useMemo(() => {
     let list = allLeads;
@@ -68,12 +34,32 @@ export default function AdminLeads() {
     converted: allLeads.filter(l => l.status === '已成交').length,
   }), [allLeads]);
 
+  const refreshLeads = () => setAllLeads(getAllManagedLeads(user));
+
   const handleStatusChange = (leadId: string, newStatus: string) => {
+    const status = newStatus as LeadStatus;
+    const stored = updateStoredShareLead(leadId, { status }, user?.phone);
+    if (stored) {
+      refreshLeads();
+    } else {
+      setAllLeads(prev => prev.map(lead => lead.id === leadId ? { ...lead, status } : lead));
+    }
     showToast(`跟进状态已更新为「${newStatus}」`);
   };
 
   const handleAddNote = (leadId: string) => {
     if (!noteText.trim()) return;
+    const existing = allLeads.find(lead => lead.id === leadId);
+    const createdAt = new Date().toLocaleString('zh-CN', { hour12: false });
+    const nextNotes = [existing?.notes, `${createdAt} ${user?.name || '操作人'}：${noteText.trim()}`]
+      .filter(Boolean)
+      .join('\n');
+    const stored = updateStoredShareLead(leadId, { notes: nextNotes }, user?.phone);
+    if (stored) {
+      refreshLeads();
+    } else {
+      setAllLeads(prev => prev.map(lead => lead.id === leadId ? { ...lead, notes: nextNotes } : lead));
+    }
     showToast('备注已添加');
     setNoteText('');
     setSelectedLead(null);
@@ -166,6 +152,7 @@ export default function AdminLeads() {
             const sourceCase = getAllDeliveryTasks().find(t => t.id === lead.sourceCaseId)
               || mockPublicCases.find(c => c.id === lead.sourceCaseId);
             const sourceStoreName = lead.sourceStoreName || (sourceCase as any)?.storeName || '';
+            const sourceSalesName = (sourceCase as any)?.salesName || lead.sourceSalesId || '';
             return (
               <div key={lead.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
                 <div className="p-4">
@@ -182,8 +169,8 @@ export default function AdminLeads() {
                   {/* Info Grid */}
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs mt-2">
                     <div>
-                      <span className="text-gray-400">城市：</span>
-                      <span className="text-gray-700">{lead.city}</span>
+                      <span className="text-gray-400">客户城市：</span>
+                      <span className="text-gray-700">{lead.city || '未填写'}</span>
                     </div>
                     <div>
                       <span className="text-gray-400">意向产品：</span>
@@ -202,13 +189,25 @@ export default function AdminLeads() {
                       <span className="text-gray-400">提交时间：</span>
                       <span className="text-gray-700 text-[10px]">{lead.createdAt}</span>
                     </div>
+                    {lead.sourceChannel && (
+                      <div>
+                        <span className="text-gray-400">渠道：</span>
+                        <span className="text-gray-700">{lead.sourceChannel}</span>
+                      </div>
+                    )}
+                    {lead.sourceEntry && (
+                      <div>
+                        <span className="text-gray-400">入口：</span>
+                        <span className="text-gray-700">{lead.sourceEntry}</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Source Case */}
                   {sourceCase && (
                     <div className="mt-2 bg-gray-50 rounded-lg px-3 py-1.5 text-xs text-gray-500 flex items-center justify-between">
                       <span>来源：{(sourceCase as any).storeName ? `${(sourceCase as any).storeName} · ` : ''}{sourceCase.brand} {sourceCase.model} · {sourceCase.city}</span>
-                      {lead.sourceSalesId && <span className="text-primary-600 font-medium">归属销售</span>}
+                      {sourceSalesName && <span className="text-primary-600 font-medium">{sourceSalesName}</span>}
                     </div>
                   )}
 
@@ -222,7 +221,8 @@ export default function AdminLeads() {
                   {/* Notes */}
                   {lead.notes && (
                     <div className="mt-2 bg-blue-50 rounded-lg px-3 py-2 text-xs text-blue-700">
-                      <FileText size={12} className="inline mr-1" />{lead.notes}
+                      <FileText size={12} className="inline mr-1" />
+                      <span className="whitespace-pre-wrap">{lead.notes}</span>
                     </div>
                   )}
                 </div>

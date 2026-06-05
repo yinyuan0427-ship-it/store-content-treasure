@@ -1,23 +1,16 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useToast } from '../App';
-import { getAllDeliveryTasks, updateDeliveryTask } from '../mock/data';
-import { PenLine } from 'lucide-react';
+import { useAuth, useToast } from '../App';
+import { getAllDeliveryTasks, getSalesByUserId, updateDeliveryTask } from '../mock/data';
+import { PenLine, Shield } from 'lucide-react';
 
 export default function DeliveryStory() {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { showToast } = useToast();
 
   const task = getAllDeliveryTasks().find(t => t.id === taskId);
-
-  const initialStoryText = [
-    task?.storyWhy,
-    task?.storyFocus,
-    task?.storyReason,
-    task?.storyFeedback,
-  ].filter(Boolean).join('\n\n');
-  const [storyText, setStoryText] = useState(initialStoryText);
 
   if (!task) {
     return (
@@ -29,6 +22,35 @@ export default function DeliveryStory() {
       </div>
     );
   }
+
+  const currentSalesId = user?.role === 'sales'
+    ? getSalesByUserId(user?.phone || '')?.id || ''
+    : '';
+  const isOwnerSales = user?.role === 'sales' && currentSalesId === task.salesId;
+  const canEdit = user?.role === 'admin' || user?.role === 'dealer_owner' || isOwnerSales;
+
+  if (!canEdit) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface-50">
+        <div className="text-center px-5 max-w-sm">
+          <div className="w-16 h-16 bg-surface-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Shield size={28} className="text-surface-400" />
+          </div>
+          <h1 className="text-lg font-semibold text-gray-900 mb-2">无权编辑该案例</h1>
+          <p className="text-sm text-surface-500 leading-relaxed mb-6">只能编辑自己名下的案例成交故事。</p>
+          <button onClick={() => navigate(-1)} className="px-6 py-2.5 bg-navy-800 text-white font-medium rounded-xl text-sm">返回</button>
+        </div>
+      </div>
+    );
+  }
+
+  const initialStoryText = [
+    task.storyWhy,
+    task.storyFocus,
+    task.storyReason,
+    task.storyFeedback,
+  ].filter(Boolean).join('\n\n');
+  const [storyText, setStoryText] = useState(initialStoryText);
 
   const handleSubmit = () => {
     if (!storyText.trim()) { showToast('请填写成交故事'); return; }

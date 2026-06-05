@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { addShareLead, getAllDeliveryTasks, mockPublicCases } from '../mock/data';
-import { ArrowLeft, CheckCircle2, Shield, Phone, MapPin, ShoppingBag, FileText, Store } from 'lucide-react';
+import { getAllDeliveryTasks, mockPublicCases } from '../mock/data';
+import type { DeliveryTask } from '../mock/data';
+import { fetchCaseById } from '../api/cases';
+import { createShareLead } from '../utils/leads';
+import { ArrowLeft, CheckCircle2, Shield, Phone, MapPin, ShoppingBag, FileText } from 'lucide-react';
 
 const interestTypes = [
   '预约到店试睡',
@@ -15,22 +18,64 @@ export default function LeadForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sourceSalesId = searchParams.get('salesId') || '';
+  const sourceStoreId = searchParams.get('storeId') || '';
+  const sourceChannel = searchParams.get('channel') || 'lead_form';
+  const sourceEntry = searchParams.get('entry') || 'lead_form';
   const interestParam = searchParams.get('interestType') || '';
 
   const sourceData =
     mockPublicCases.find(c => c.id === caseId) ||
     getAllDeliveryTasks().find(t => t.id === caseId);
+  const [remoteSourceData, setRemoteSourceData] = useState<DeliveryTask | null>(null);
+  const [remoteLoaded, setRemoteLoaded] = useState(false);
+  const resolvedSourceData = sourceData || remoteSourceData;
 
   const [alias, setAlias] = useState('');
   const [phone, setPhone] = useState('');
-  const [city, setCity] = useState(sourceData?.city || '');
+  const [city, setCity] = useState('');
   const [product, setProduct] = useState(sourceData ? `${sourceData.brand} ${sourceData.model}` : '');
   const [interest, setInterest] = useState(interestParam || '');
   const [remark, setRemark] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const phoneValid = /^1[3-9]\d{9}$/.test(phone.trim());
 
-  if (!sourceData) {
+  useEffect(() => {
+    if (!caseId || sourceData) {
+      setRemoteLoaded(true);
+      return;
+    }
+
+    let cancelled = false;
+    setRemoteLoaded(false);
+    fetchCaseById(caseId).then((caseData) => {
+      if (cancelled) return;
+      setRemoteSourceData(caseData);
+      setRemoteLoaded(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [caseId, sourceData?.id]);
+
+  useEffect(() => {
+    if (resolvedSourceData && !product.trim()) {
+      setProduct(`${resolvedSourceData.brand} ${resolvedSourceData.model}`);
+    }
+  }, [resolvedSourceData?.id, product]);
+
+  if (!resolvedSourceData && !remoteLoaded) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-surface-50">
+        <div className="text-center">
+          <p className="text-surface-400 mb-4">正在加载案例...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!resolvedSourceData) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface-50">
         <div className="text-center">
@@ -43,23 +88,26 @@ export default function LeadForm() {
 
   const handleSubmit = () => {
     if (!alias.trim()) return;
-    if (!phone.trim() || phone.length < 11) return;
+    if (!phoneValid) return;
     if (!city.trim()) return;
     if (!interest) return;
     if (!agreed) return;
 
-    addShareLead({
+    createShareLead({
       alias: alias.trim(),
       phone: phone.trim(),
       city: city.trim(),
       remark: remark.trim(),
-      sourceCaseId: sourceData.id,
-      sourceStoreId: sourceData.storeId,
-      sourceStoreName: sourceData.storeName,
-      sourceSalesId: sourceSalesId || sourceData.salesId,
-      interestProduct: product.trim() || `${sourceData.brand} ${sourceData.model}`,
+      sourceCaseId: resolvedSourceData.id,
+      sourceStoreId: sourceStoreId || resolvedSourceData.storeId,
+      sourceStoreName: resolvedSourceData.storeName,
+      sourceSalesId: sourceSalesId || resolvedSourceData.salesId,
+      interestProduct: product.trim() || `${resolvedSourceData.brand} ${resolvedSourceData.model}`,
       interestType: interest,
       sourceAction: interest === '咨询同款方案' ? 'consult_same_product' : 'book_visit',
+      sourceChannel,
+      sourceEntry,
+      sourceUrl: window.location.href,
       createdAt: new Date().toISOString(),
     });
     setSubmitted(true);
@@ -76,17 +124,6 @@ export default function LeadForm() {
           <p className="text-surface-500 text-sm leading-relaxed mb-1">睡眠顾问会尽快联系您</p>
           <p className="text-xs text-surface-400 mb-2">请保持手机畅通</p>
 
-          <div className="bg-surface-50 rounded-xl p-3 text-left mb-6">
-            <div className="flex items-center gap-2 mb-1">
-              <Store size={14} className="text-surface-400" />
-              <span className="text-xs text-surface-600">{sourceData.storeName}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <MapPin size={14} className="text-surface-400" />
-              <span className="text-xs text-surface-600">{sourceData.city}</span>
-            </div>
-          </div>
-
           <button onClick={() => navigate('/cases')}
             className="w-full h-12 bg-navy-800 text-white font-semibold rounded-xl text-sm active:bg-navy-900 transition-colors">
             浏览更多案例
@@ -96,7 +133,7 @@ export default function LeadForm() {
     );
   }
 
-  const sourceCaseLabel = `${sourceData.city} · ${sourceData.brand} ${sourceData.model}`;
+  const sourceCaseLabel = `${resolvedSourceData.brand} ${resolvedSourceData.model}`;
 
   return (
     <div className="min-h-screen bg-white">
@@ -105,7 +142,7 @@ export default function LeadForm() {
           <ArrowLeft size={22} />
         </button>
         <h1 className="text-xl font-bold text-gray-900">预约咨询</h1>
-        <p className="text-surface-400 text-sm mt-1">留下联系方式，专业睡眠顾问为您服务</p>
+        <p className="text-surface-400 text-sm mt-1">留下联系方式，专业睡眠顾问将尽快联系您</p>
 
         <div className="mt-3 bg-surface-50 rounded-xl px-3 py-2 text-xs text-surface-500 flex items-center gap-2">
           <FileText size={14} className="text-surface-400" />
@@ -132,6 +169,9 @@ export default function LeadForm() {
             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
               placeholder="请输入手机号" className="flex-1 h-11 bg-transparent text-sm focus:outline-none" />
           </div>
+          {phone.trim() && !phoneValid && (
+            <p className="text-[10px] text-red-500 mt-1">请输入有效的 11 位手机号</p>
+          )}
         </div>
 
         <div>
@@ -141,7 +181,7 @@ export default function LeadForm() {
           <div className="flex items-center gap-2 bg-surface-50 border border-surface-200 rounded-xl px-3 focus-within:border-navy-400 transition-colors">
             <MapPin size={14} className="text-surface-400" />
             <input type="text" value={city} onChange={(e) => setCity(e.target.value)}
-              placeholder="如：苏州" className="flex-1 h-11 bg-transparent text-sm focus:outline-none" />
+              placeholder="如：您所在的城市" className="flex-1 h-11 bg-transparent text-sm focus:outline-none" />
           </div>
         </div>
 
@@ -180,7 +220,7 @@ export default function LeadForm() {
         <div className="bg-warm-50 border border-warm-100 rounded-xl p-4 flex items-start gap-2">
           <Shield size={16} className="text-warm-500 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-warm-700 leading-relaxed">
-            我们仅用于门店睡眠顾问联系您，不会公开展示您的个人信息。
+            我们仅用于睡眠顾问联系您，不会公开展示您的个人信息。
           </p>
         </div>
 
@@ -195,12 +235,12 @@ export default function LeadForm() {
             )}
           </div>
           <span className={`text-sm leading-relaxed ${agreed ? 'text-gray-700 font-medium' : 'text-surface-500'}`}>
-            我同意门店通过电话或微信联系我 <span className="text-red-400">*</span>
+            我同意睡眠顾问通过电话或微信联系我 <span className="text-red-400">*</span>
           </span>
         </button>
 
         <button onClick={handleSubmit}
-          disabled={!alias.trim() || phone.trim().length < 11 || !city.trim() || !interest || !agreed}
+          disabled={!alias.trim() || !phoneValid || !city.trim() || !interest || !agreed}
           className="w-full h-12 bg-navy-800 text-white font-semibold rounded-xl text-base active:bg-navy-900 transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
           提交咨询
         </button>

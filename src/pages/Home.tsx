@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth, useToast } from '../App';
-import { mockMaterials, mockDeliveryTasks, getAllDeliveryTasks, getAllPointRecords, getTodayPostingStatus, markTodayPosting, getMonthlyPostingDays, getConsecutiveDays, getDailyMaterial, POINTS_RULES, getShareableCases, getTodayXhsStatus, markTodayXhs, getMonthlyXhsDays, getXhsWeeklyCount, getDailyXhsMaterial, getDailyMomentsMaterial, ensureStarterCaseCoins, getApprovedDealReports, getAllDealReports, mockLeads, mockSalesPersons, canShareCase, getLeadsForStore, getInstallerByUserId, getSalesByUserId } from '../mock/data';
+import { mockMaterials, mockDeliveryTasks, getAllDeliveryTasks, getAllPointRecords, getTodayPostingStatus, markTodayPosting, getMonthlyPostingDays, getConsecutiveDays, getDailyMaterial, POINTS_RULES, getShareableCases, getTodayXhsStatus, markTodayXhs, getMonthlyXhsDays, getXhsWeeklyCount, getDailyXhsMaterial, getDailyMomentsMaterial, ensureStarterCaseCoins, getApprovedDealReports, getAllDealReports, mockSalesPersons, canShareCase, getInstallerByUserId, getSalesByUserId } from '../mock/data';
 import { useMemo, useState, useEffect } from 'react';
 import {
   Camera, CheckCircle2, Upload, Sparkles, Copy, ChevronRight,
@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { copyText } from '../utils/clipboard';
 import CopyModal from '../components/CopyModal';
+import { getShareUrl } from '../utils/share';
+import { getAllManagedLeads } from '../utils/leads';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -96,10 +98,20 @@ export default function Home() {
   };
 
   // ── 分享案例 handlers ──
+  const getCurrentShareSalesId = () => {
+    if (!shareCase) return '';
+    if (user?.role === 'sales') return getSalesByUserId(user.phone)?.id || shareCase.salesId;
+    return shareCase.salesId || '';
+  };
+
   const handleCopyCaseLink = async () => {
     if (!shareCase) return;
-    const salesId = shareCase.salesId || '';
-    const link = `${window.location.origin}/share/${shareCase.id}?salesId=${salesId}`;
+    const salesId = getCurrentShareSalesId();
+    const link = getShareUrl(shareCase.id, salesId, {
+      storeId: shareCase.storeId,
+      channel: 'wechat_private',
+      entry: 'home_today_case',
+    });
     const result = await copyText(link);
     if (result.success) {
       showToast('案例链接已复制，可以发给意向客户');
@@ -111,7 +123,7 @@ export default function Home() {
   const generateSendScript = () => {
     if (!shareCase) return '';
     const product = shareCase.productName || `${shareCase.brand} ${shareCase.model}`;
-    return `这个是我们${shareCase.city}客户${shareCase.scene}的真实案例，用的是 ${product}，你可以先看看，和你家的情况有点像。如果你也想了解同款，我可以帮你约到店体验。`;
+    return `这个是真实交付案例，用的是 ${product}，你可以先看看，和你家的情况有点像。如果你也想了解同款，我可以帮你预约体验或让睡眠顾问进一步介绍。`;
   };
 
   const handleCopyScript = async () => {
@@ -127,8 +139,13 @@ export default function Home() {
 
   const handlePreviewCase = () => {
     if (!shareCase) return;
-    const salesId = shareCase.salesId || '';
-    navigate(`/share/${shareCase.id}?salesId=${salesId}`);
+    const salesId = getCurrentShareSalesId();
+    const url = new URL(getShareUrl(shareCase.id, salesId, {
+      storeId: shareCase.storeId,
+      channel: 'preview',
+      entry: 'home_today_case',
+    }));
+    navigate(`${url.pathname}${url.search}`);
   };
 
   const handleSwitchCase = () => {
@@ -222,17 +239,7 @@ export default function Home() {
     const suspectedDup = allTasks.filter(t => t.reviewStatus === 'suspected_dup').length;
     const pendingDeals = getAllDealReports().filter(d => d.status === 'pending').length;
     const todayStr = today.toISOString().slice(0, 10);
-    const storedLeads = (() => {
-      try {
-        const raw = localStorage.getItem('sct-share-leads');
-        if (!raw) return [];
-        return JSON.parse(raw);
-      } catch { return []; }
-    })();
-    const allLeads = [
-      ...mockLeads,
-      ...storedLeads.map((item: any) => ({ status: '待联系' as const, createdAt: item.createdAt || '' })),
-    ];
+    const allLeads = getAllManagedLeads(user);
     const todayLeads = allLeads.filter(l => l.createdAt.startsWith(todayStr)).length;
     const pendingLeads = allLeads.filter(l => l.status === '待联系').length;
     const priorityCases = allTasks
@@ -251,7 +258,7 @@ export default function Home() {
     const shareable = storeTasks.filter(t => canShareCase(t)).length;
     const rejected = storeTasks.filter(t => t.reviewStatus === 'rejected').length;
     const approvedDeals = getApprovedDealReports().filter(d => d.storeId === user.storeId && d.createdAt.startsWith(monthStr)).length;
-    const pendingLeads = mockLeads.filter(l => l.sourceStoreId === user.storeId && l.status === '待联系').length + getLeadsForStore(user.storeId).length;
+    const pendingLeads = getAllManagedLeads(user).filter(l => l.status === '待联系').length;
     const storeSales = mockSalesPersons.filter(s => s.storeId === user.storeId);
     const salesCompletion = storeSales.map(s => {
       const salesTasks = storeTasks.filter(t => t.salesId === s.id);
@@ -392,112 +399,136 @@ export default function Home() {
       </div>
 
       {/* ═══════════════════════════════════ */}
-      {/* ── 今日建议完成 ── */}
+      {/* ── 今日进度（导购）── */}
       {/* ═══════════════════════════════════ */}
-      <div className="px-4 -mt-3 relative z-10">
-        <div className="bg-white rounded-2xl shadow-card border border-surface-100 px-4 py-4">
-          <h2 className="text-[15px] font-bold text-gray-900 mb-3">今日建议完成</h2>
-          <div className="space-y-2.5">
-            {user.role === 'installer' ? (
-              <>
-                <div className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">查看待安装任务</p>
-                    <p className="text-xs text-surface-400">确认今天的上门安装安排</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">拍照上传安装照片</p>
-                    <p className="text-xs text-surface-400">安装完成后及时拍照提交</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">确认安装完成</p>
-                    <p className="text-xs text-surface-400">选择安装状态，完成本次任务</p>
-                  </div>
-                </div>
-              </>
-            ) : user.role === 'admin' ? (
-              <>
-                <div className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">审核待处理的案例</p>
-                    <p className="text-xs text-surface-400">审核安装照片和成交故事</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">审核成交喜报</p>
-                    <p className="text-xs text-surface-400">审核销售提交的成交战报</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">精选优质案例</p>
-                    <p className="text-xs text-surface-400">将好案例标记为精选，激励全员</p>
-                  </div>
-                </div>
-              </>
-            ) : user.role === 'dealer_owner' ? (
-              <>
-                <div className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">检查本店待补故事</p>
-                    <p className="text-xs text-surface-400">督促导购补充成交故事，提升案例质量</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">提醒导购完成内容任务</p>
-                    <p className="text-xs text-surface-400">确保门店朋友圈、小红书内容按时发布</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">分享门店案例给意向客户</p>
-                    <p className="text-xs text-surface-400">用真实交付案例加速客户成交决策</p>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">发布一条朋友圈</p>
-                    <p className="text-xs text-surface-400">复制文案发到微信，每日必做 +{POINTS_RULES.daily_posting}积分</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">分享案例给意向客户</p>
-                    <p className="text-xs text-surface-400">把真实交付案例发给客户，加速成交</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-                  <div>
-                    <p className="text-sm font-medium text-gray-800">上传今日交付案例</p>
-                    <p className="text-xs text-surface-400">有成交就上传，审核通过 +20 积分</p>
-                  </div>
-                </div>
-              </>
-            )}
+      {user.role === 'sales' && (
+        <div className="px-4 -mt-3 relative z-10">
+          <div className="bg-white rounded-2xl shadow-card border border-surface-100 px-4 py-3">
+            <div className="flex items-center justify-between mb-2.5">
+              <h2 className="text-[13px] font-bold text-gray-900">今日进度</h2>
+              <span className="text-[11px] text-surface-400">
+                {(postingStatus === 'done' ? 1 : 0) + (xhsStatus === 'done' ? 1 : 0)}/3 已完成
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => document.getElementById('content-tasks-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className={`flex-1 h-9 rounded-lg text-[11px] font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                  postingStatus === 'done'
+                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    : 'bg-surface-50 text-surface-400'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${postingStatus === 'done' ? 'bg-green-500' : 'bg-surface-300'}`} />
+                朋友圈{postingStatus === 'done' ? ' ✓' : ''}
+              </button>
+              <button
+                onClick={() => document.getElementById('content-tasks-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                className={`flex-1 h-9 rounded-lg text-[11px] font-medium flex items-center justify-center gap-1.5 transition-colors ${
+                  xhsStatus === 'done'
+                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    : 'bg-surface-50 text-surface-400'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${xhsStatus === 'done' ? 'bg-green-500' : 'bg-surface-300'}`} />
+                小红书{xhsStatus === 'done' ? ' ✓' : ''}
+              </button>
+              <button
+                onClick={() => navigate('/cases-hub?tab=all_shareable')}
+                className="flex-1 h-9 rounded-lg bg-navy-50 text-navy-700 text-[11px] font-medium flex items-center justify-center gap-1.5 active:bg-navy-100 transition-colors border border-navy-100"
+              >
+                案例分享 <ArrowRight size={11} />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* ═══════════════════════════════════ */}
+      {/* ── 今日建议完成（非导购角色）── */}
+      {/* ═══════════════════════════════════ */}
+      {user.role !== 'sales' && (
+        <div className="px-4 -mt-3 relative z-10">
+          <div className="bg-white rounded-2xl shadow-card border border-surface-100 px-4 py-4">
+            <h2 className="text-[15px] font-bold text-gray-900 mb-3">今日建议完成</h2>
+            <div className="space-y-2.5">
+              {user.role === 'installer' ? (
+                <>
+                  <div className="flex items-start gap-3">
+                    <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">查看待安装任务</p>
+                      <p className="text-xs text-surface-400">确认今天的上门安装安排</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">拍照上传安装照片</p>
+                      <p className="text-xs text-surface-400">安装完成后及时拍照提交</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">确认安装完成</p>
+                      <p className="text-xs text-surface-400">选择安装状态，完成本次任务</p>
+                    </div>
+                  </div>
+                </>
+              ) : user.role === 'admin' ? (
+                <>
+                  <div className="flex items-start gap-3">
+                    <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">审核待处理的案例</p>
+                      <p className="text-xs text-surface-400">审核安装照片和成交故事</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">审核成交喜报</p>
+                      <p className="text-xs text-surface-400">审核销售提交的成交战报</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">精选优质案例</p>
+                      <p className="text-xs text-surface-400">将好案例标记为精选，激励全员</p>
+                    </div>
+                  </div>
+                </>
+              ) : user.role === 'dealer_owner' ? (
+                <>
+                  <div className="flex items-start gap-3">
+                    <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">检查本店待补故事</p>
+                      <p className="text-xs text-surface-400">督促导购补充成交故事，提升案例质量</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">提醒导购完成内容任务</p>
+                      <p className="text-xs text-surface-400">确保门店朋友圈、小红书内容按时发布</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="w-5 h-5 rounded-full bg-navy-800 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+                    <div>
+                      <p className="text-sm font-medium text-gray-800">分享门店案例给意向客户</p>
+                      <p className="text-xs text-surface-400">用真实交付案例加速客户成交决策</p>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      )}
 
       {user.role === 'admin' && adminStats ? (<>
         {/* ── Admin Stats Overview ── */}
@@ -805,7 +836,7 @@ export default function Home() {
       {/* ═══════════════════════════════════ */}
       {/* ── 今日内容任务 ── */}
       {/* ═══════════════════════════════════ */}
-      <div className="px-4 -mt-3 relative z-10">
+      <div className="px-4 -mt-3 relative z-10" id="content-tasks-section">
         <div className={`rounded-2xl shadow-card border ${postingStatus === 'done' ? 'bg-green-50/40 border-green-200' : 'bg-white border-surface-100'}`}>
           {/* Module header */}
           <div className="px-4 pt-4 pb-2 flex items-center justify-between">
@@ -941,14 +972,11 @@ export default function Home() {
                     </span>
                   </div>
                   <p className="text-sm font-semibold text-gray-900 line-clamp-1">
-                    {shareCase.city}{shareCase.customerAlias} · {shareCase.model}
+                    {shareCase.customerAlias} · {shareCase.model}
                   </p>
-                  <p className="text-xs text-surface-400 mt-0.5">
-                    <Store size={10} className="inline mr-0.5" />{shareCase.storeName}
-                    {shareCase.storyFeedback && (
-                      <span className="ml-2 text-warm-600 line-clamp-1">{shareCase.storyFeedback}</span>
-                    )}
-                  </p>
+                  {shareCase.storyFeedback && (
+                    <p className="text-xs text-warm-600 mt-0.5 line-clamp-1">{shareCase.storyFeedback}</p>
+                  )}
                 </div>
               </div>
 

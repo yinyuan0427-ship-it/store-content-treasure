@@ -172,8 +172,6 @@ export function buildUserPrompt(ctx: PromptContext): string {
   parts.push(`目标平台：${ctx.platform}`);
   parts.push(`发布角色：${ctx.role}`);
   parts.push(`语气风格：${ctx.tone}`);
-  parts.push(`城市：${ctx.city}`);
-  parts.push(`门店：${ctx.storeName}`);
   parts.push(`产品：${ctx.productName}`);
   parts.push(`场景：${ctx.scene}`);
   parts.push(`图片数量：${ctx.imageCount} 张`);

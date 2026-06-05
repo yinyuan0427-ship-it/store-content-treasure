@@ -1,10 +1,12 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth, useToast, useFavorites } from '../App';
-import { canShareCase, getAllDeliveryTasks, getInstallerByUserId } from '../mock/data';
+import { canShareCase, getAllDeliveryTasks, getInstallerByUserId, getSalesByUserId, updateDeliveryTask, getStoryText } from '../mock/data';
 import { useState } from 'react';
 import CopyModal from '../components/CopyModal';
 import { copyText } from '../utils/clipboard';
-import { ArrowLeft, Star, MapPin, Store, Camera, PenLine, Eye, CheckCircle2, Share2, Copy, Sparkles } from 'lucide-react';
+import { generateCustomerShareText, getShareUrl, truncateForPoster } from '../utils/share';
+import { QRCodeSVG } from 'qrcode.react';
+import { ArrowLeft, Star, MapPin, Store, Camera, PenLine, Eye, CheckCircle2, Share2, Copy, Sparkles, QrCode, X, Image } from 'lucide-react';
 
 export default function DeliveryDetail() {
   const { taskId } = useParams<{ taskId: string }>();
@@ -30,6 +32,18 @@ export default function DeliveryDetail() {
 
   const isInstaller = user?.role === 'installer';
   const currentInstallerId = isInstaller ? getInstallerByUserId(user?.phone || '')?.id || null : null;
+
+  const currentSalesId = user?.role === 'sales'
+    ? getSalesByUserId(user?.phone || '')?.id || ''
+    : '';
+  const isOwnerSales = user?.role === 'sales' && currentSalesId === task.salesId;
+  const isDealerOwner = user?.role === 'dealer_owner';
+  const isAdmin = user?.role === 'admin';
+  const canEditCaseContent = isOwnerSales || isDealerOwner || isAdmin;
+
+  const canEditRequirement = canEditCaseContent;
+  const [editRequirementModal, setEditRequirementModal] = useState(false);
+  const [editRequirementText, setEditRequirementText] = useState('');
   if (isInstaller && task.installerId !== currentInstallerId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-surface-50">
@@ -70,21 +84,13 @@ export default function DeliveryDetail() {
     }
   };
 
-  const generateCopyText = () => {
-    let txt = `城市：${task.city}\n`;
-    txt += `场景：${task.scene}\n`;
-    txt += `产品：${task.brand} ${task.model} ${task.size}\n`;
-    if (task.storyWhy) txt += `\n购买背景：${task.storyWhy}\n`;
-    if (task.storyFeedback) txt += `\n客户评价：${task.storyFeedback}\n`;
-    if (task.storyFocus) txt += `\n关注点：${task.storyFocus}\n`;
-    txt += `\n—— ${task.storeName} · ${task.salesName}`;
-    return txt;
-  };
+  const [showPosterModal, setShowPosterModal] = useState(false);
+  const shareSalesId = currentSalesId || task.salesId;
 
-  const isSales = user?.role === 'sales';
   const canUploadPhoto = isInstaller && task.installImages.length === 0;
-  const canEditStory = (isSales || user?.role === 'dealer_owner' || user?.role === 'admin') && task.installImages.length > 0;
-  const canAddStory = canEditStory && !task.storyWhy;
+  const canOwnerUploadPhoto = canEditCaseContent && task.installImages.length === 0;
+  const canEditStory = canEditCaseContent && task.installImages.length > 0;
+  const canAddStory = canEditStory && !getStoryText(task);
   const canReuploadCleanPhotos = isInstaller && (
     task.reviewStatus === 'rejected' ||
     task.reviewStatus === 'suspected_dup' ||
@@ -121,14 +127,26 @@ export default function DeliveryDetail() {
             <div className="flex justify-between"><span className="text-surface-400">尺寸</span><span className="text-gray-900">{task.size}</span></div>
             <div className="flex justify-between"><span className="text-surface-400">场景</span><span className="text-gray-900">{task.scene}</span></div>
             <div className="flex justify-between"><span className="text-surface-400">销售</span><span className="text-gray-900">{task.salesName}</span></div>
-            <div className="flex justify-between"><span className="text-surface-400">安装师傅</span><span className="text-gray-900">{task.installerName}</span></div>
+            {task.installerName ? (
+              <div className="flex justify-between"><span className="text-surface-400">安装师傅</span><span className="text-gray-900">{task.installerName}</span></div>
+            ) : (
+              <div className="flex justify-between"><span className="text-surface-400">采集方式</span><span className="text-gray-900">导购上传</span></div>
+            )}
             {!isInstaller && (
             <div className="flex justify-between"><span className="text-surface-400">分享状态</span><span className={`font-medium ${task.authStatus === '可公开使用' ? 'text-green-600' : task.authStatus === '仅内部学习' ? 'text-warm-600' : 'text-surface-500'}`}>{task.authStatus === '可公开使用' ? '可分享' : task.authStatus === '仅内部学习' ? '内部案例' : '待审核'}</span></div>
             )}
           </div>
           {task.customerRequirement && (
             <div className="mt-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
-              <p className="text-xs text-blue-500 font-medium mb-1">客户需求</p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs text-blue-500 font-medium">客户需求</p>
+                {canEditRequirement && (
+                  <button
+                    onClick={() => { setEditRequirementText(task.customerRequirement); setEditRequirementModal(true); }}
+                    className="text-xs text-navy-700 font-medium bg-navy-50 px-2 py-1 rounded-full active:bg-navy-100 transition-colors"
+                  >编辑</button>
+                )}
+              </div>
               <p className="text-sm text-blue-800">{task.customerRequirement}</p>
             </div>
           )}
@@ -138,7 +156,7 @@ export default function DeliveryDetail() {
         <div className="bg-white rounded-2xl p-4 shadow-card">
           <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
             <Camera size={16} />
-            安装照片
+            {task.installerId ? '安装照片' : '案例照片'}
             {task.installImages.length > 0 && <span className="text-surface-400 font-normal ml-1">({task.installImages.length}张)</span>}
           </h3>
           {task.installImages.length > 0 ? (
@@ -152,7 +170,7 @@ export default function DeliveryDetail() {
                 >
                   <img
                     src={img}
-                    alt={`安装图${i + 1}`}
+                    alt={`照片${i + 1}`}
                     className="w-full h-full object-cover"
                     style={{ WebkitTouchCallout: 'default', WebkitUserSelect: 'auto', userSelect: 'auto' }}
                   />
@@ -178,7 +196,7 @@ export default function DeliveryDetail() {
           ) : (
             <div className="text-center py-8 text-surface-400 text-sm">
               <Camera size={32} className="mx-auto mb-2" strokeWidth={1} />
-              <p>安装师傅还未上传照片</p>
+              <p>{task.installerId ? '安装师傅还未上传照片' : '还未上传案例照片'}</p>
             </div>
           )}
           {task.installStatus && (
@@ -197,14 +215,14 @@ export default function DeliveryDetail() {
         </div>
 
         {/* Sales Story */}
-        {!isInstaller && (task.storyWhy || canEditStory) && (
+        {!isInstaller && (getStoryText(task) || canEditStory) && (
           <div className="bg-white rounded-2xl p-4 shadow-card">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
                 <PenLine size={16} />
                 成交故事
               </h3>
-              {task.storyWhy && canEditStory && (
+              {getStoryText(task) && canEditStory && (
                 <button
                   onClick={() => navigate(`/delivery/story/${task.id}`)}
                   className="text-xs text-navy-700 font-medium bg-navy-50 px-3 py-1.5 rounded-full active:bg-navy-100 transition-colors"
@@ -213,34 +231,15 @@ export default function DeliveryDetail() {
                 </button>
               )}
             </div>
-            {task.storyWhy ? (
-              <div className="space-y-3 text-sm">
-                <div>
-                  <p className="text-xs text-surface-400 mb-1">客户为什么购买</p>
-                  <p className="text-gray-700">{task.storyWhy}</p>
-                </div>
-                {task.storyFocus && (
-                  <div>
-                    <p className="text-xs text-surface-400 mb-1">客户最关注什么</p>
-                    <p className="text-gray-700">{task.storyFocus}</p>
-                  </div>
-                )}
-                {task.storyReason && (
-                  <div>
-                    <p className="text-xs text-surface-400 mb-1">最终选择原因</p>
-                    <p className="text-gray-700">{task.storyReason}</p>
-                  </div>
-                )}
-                {task.storyFeedback && (
-                  <div>
-                    <p className="text-xs text-surface-400 mb-1">客户反馈</p>
-                    <p className="text-gray-700">{task.storyFeedback}</p>
-                  </div>
-                )}
+            {getStoryText(task) ? (
+              <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                {getStoryText(task)}
                 {user?.role === 'admin' && task.storyPublic && (
-                  <span className={`inline-block text-xs px-2 py-1 rounded-full ${
-                    task.storyPublic === '适合公开传播' ? 'bg-green-50 text-green-600' : 'bg-surface-50 text-surface-500'
-                  }`}>{task.storyPublic}</span>
+                  <div className="mt-2">
+                    <span className={`inline-block text-xs px-2 py-1 rounded-full ${
+                      task.storyPublic === '适合公开传播' ? 'bg-green-50 text-green-600' : 'bg-surface-50 text-surface-500'
+                    }`}>{task.storyPublic}</span>
+                  </div>
                 )}
               </div>
             ) : (
@@ -283,7 +282,7 @@ export default function DeliveryDetail() {
         )}
 
         {/* AI Generate Section */}
-        {!isInstaller && task.installImages.length > 0 && (
+        {!isInstaller && canEditCaseContent && task.installImages.length > 0 && (
           <div className="bg-white rounded-2xl p-4 shadow-card border border-purple-100">
             <div className="mb-3">
               <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
@@ -371,30 +370,48 @@ export default function DeliveryDetail() {
 
             {canShare ? (
               <>
-                <div className="flex gap-2 mb-3">
+                <div className="flex gap-2 mb-2">
                   <button
                     onClick={() => {
-                      const url = `${window.location.origin}/share/${task.id}?salesId=${task.salesId}`;
+                      const url = getShareUrl(task.id, shareSalesId, {
+                        storeId: task.storeId,
+                        channel: 'wechat_private',
+                        entry: 'delivery_detail',
+                      });
                       copyText(url).then((result) => {
-                        if (result.success) showToast('案例链接已复制，可以发给意向客户');
+                        if (result.success) showToast('链接已复制，发送到微信后将展示案例卡片');
                         else setCopyModalText(url);
                       });
                     }}
                     className="flex-1 h-11 bg-navy-800 text-white font-semibold rounded-xl text-sm active:bg-navy-900 transition-colors flex items-center justify-center gap-1.5"
                   >
                     <Copy size={15} />
-                    一键复制案例链接
+                    复制微信卡片链接
                   </button>
                   <button
-                    onClick={() => navigate(`/share/${task.id}?salesId=${task.salesId}`)}
+                    onClick={() => {
+                      const url = new URL(getShareUrl(task.id, shareSalesId, {
+                        storeId: task.storeId,
+                        channel: 'preview',
+                        entry: 'delivery_detail',
+                      }));
+                      navigate(`${url.pathname}${url.search}`);
+                    }}
                     className="flex-1 h-11 bg-white border border-surface-200 text-gray-700 font-semibold rounded-xl text-sm active:bg-surface-50 transition-colors flex items-center justify-center gap-1.5"
                   >
                     <Eye size={15} />
                     预览客户看到的页面
                   </button>
                 </div>
-                <p className="text-[10px] text-surface-400">
-                  客户打开后可预约到店或咨询同款，线索自动归属给 {task.salesName}。仅展示已通过审核且隐私已处理的信息。
+                <button
+                  onClick={() => setShowPosterModal(true)}
+                  className="w-full h-10 bg-white border border-navy-200 text-navy-700 font-semibold rounded-xl text-sm active:bg-navy-50 transition-colors flex items-center justify-center gap-1.5 mb-2"
+                >
+                  <QrCode size={15} />
+                  生成分享海报
+                </button>
+                <p className="text-[10px] text-surface-400 leading-relaxed">
+                  复制链接到微信发送后，会以案例卡片形式展示标题、摘要和封面图。本地 localhost 环境无法预览卡片效果，需部署到正式 HTTPS 域名后生效。
                 </p>
               </>
             ) : (
@@ -439,11 +456,11 @@ export default function DeliveryDetail() {
             <Star size={18} fill={isFavorited(task.id) ? '#f5a932' : 'none'} stroke={isFavorited(task.id) ? '#f5a932' : '#9ca3af'} />
           </button>
           )}
-          {!isInstaller && task.storyWhy && (
-            <button onClick={() => handleCopy(generateCopyText())}
+          {!isInstaller && (
+            <button onClick={() => handleCopy(generateCustomerShareText(task, shareSalesId))}
               className="flex-1 h-11 bg-navy-50 text-navy-700 font-semibold rounded-xl text-sm active:bg-navy-100 transition-colors flex items-center justify-center gap-1.5">
               <Copy size={15} />
-              复制案例文案
+              复制客户分享话术
             </button>
           )}
           {canUploadPhoto && (
@@ -451,6 +468,13 @@ export default function DeliveryDetail() {
               className="flex-1 h-11 bg-navy-800 text-white font-semibold rounded-xl text-sm active:bg-navy-900 transition-colors flex items-center justify-center gap-1.5">
               <Camera size={15} />
               上传安装照片
+            </button>
+          )}
+          {canOwnerUploadPhoto && (
+            <button onClick={() => navigate(`/delivery/upload/${task.id}`)}
+              className="flex-1 h-11 bg-navy-800 text-white font-semibold rounded-xl text-sm active:bg-navy-900 transition-colors flex items-center justify-center gap-1.5">
+              <Camera size={15} />
+              上传案例照片
             </button>
           )}
           {canReuploadCleanPhotos && (
@@ -482,6 +506,51 @@ export default function DeliveryDetail() {
         <CopyModal text={copyModalText} onClose={() => setCopyModalText('')} />
       )}
 
+      {/* Share Poster Modal */}
+      {showPosterModal && (
+        <SharePosterModal
+          task={task}
+          shareUrl={getShareUrl(task.id, shareSalesId, {
+            storeId: task.storeId,
+            channel: 'poster',
+            entry: 'delivery_detail',
+          })}
+          onClose={() => setShowPosterModal(false)}
+        />
+      )}
+
+      {/* Edit customer requirement modal */}
+      {editRequirementModal && (
+        <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setEditRequirementModal(false)} />
+          <div className="relative bg-white rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md p-5 animate-fade-up">
+            <h3 className="text-base font-bold text-gray-900 mb-3">编辑客户需求</h3>
+            <textarea
+              value={editRequirementText}
+              onChange={(e) => setEditRequirementText(e.target.value)}
+              className="w-full h-[120px] px-3 py-2.5 bg-surface-50 border border-surface-200 rounded-xl text-sm resize-none focus:outline-none focus:border-navy-400 transition-colors"
+              placeholder="请填写客户需求"
+            />
+            <div className="flex gap-2.5 mt-4">
+              <button
+                onClick={() => setEditRequirementModal(false)}
+                className="flex-1 h-11 bg-surface-100 text-surface-600 font-medium rounded-xl text-sm active:bg-surface-200 transition-colors"
+              >取消</button>
+              <button
+                onClick={() => {
+                  const trimmed = editRequirementText.trim();
+                  if (!trimmed) { showToast('请填写客户需求'); return; }
+                  updateDeliveryTask(task.id, { customerRequirement: trimmed });
+                  setEditRequirementModal(false);
+                  showToast('客户需求已更新');
+                }}
+                className="flex-1 h-11 bg-navy-800 text-white font-medium rounded-xl text-sm active:bg-navy-900 transition-colors"
+              >保存</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {previewImageIndex !== null && task.installImages[previewImageIndex] && (
         <div className="fixed inset-0 z-[80] bg-black flex flex-col">
           <div className="flex items-center justify-between px-4 pt-12 pb-3 text-white/80">
@@ -495,7 +564,7 @@ export default function DeliveryDetail() {
           <div className="flex-1 overflow-y-auto px-3 pb-6">
             <img
               src={task.installImages[previewImageIndex]}
-              alt={`安装大图${previewImageIndex + 1}`}
+              alt={`大图${previewImageIndex + 1}`}
               className="w-full h-auto rounded-xl"
               style={{ WebkitTouchCallout: 'default', WebkitUserSelect: 'auto', userSelect: 'auto' }}
             />
@@ -519,6 +588,106 @@ export default function DeliveryDetail() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Share Poster Modal ──
+function SharePosterModal({
+  task, shareUrl, onClose,
+}: {
+  task: NonNullable<ReturnType<typeof getAllDeliveryTasks>[number]>;
+  shareUrl: string;
+  onClose: () => void;
+}) {
+  const solution = task.productName || `${task.brand} ${task.model}`;
+  const requirement = truncateForPoster(
+    task.customerRequirement || '想改善睡眠质量，找一款合适的床垫/枕头',
+    50,
+  );
+  const feedback = truncateForPoster(
+    getStoryText(task) || '使用后睡眠质量明显改善，非常满意',
+    60,
+  );
+  const heroImage = task.installImages[0] || '';
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-t-3xl sm:rounded-3xl w-full sm:max-w-sm shadow-premium animate-fade-up max-h-[92vh] overflow-y-auto">
+        <div className="flex justify-center pt-3 pb-1">
+          <div className="w-10 h-1 rounded-full bg-surface-200" />
+        </div>
+
+        {/* Close button */}
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 w-8 h-8 bg-surface-100 rounded-full flex items-center justify-center active:bg-surface-200 transition-colors z-10"
+        >
+          <X size={16} className="text-surface-500" />
+        </button>
+
+        <div className="px-5 pb-6">
+          <h3 className="text-lg font-bold text-gray-900 mb-1">分享海报</h3>
+          <p className="text-xs text-surface-400 mb-4">长按海报图片可保存到相册，发给客户</p>
+
+          {/* Poster Card */}
+          <div className="bg-white border border-surface-200 rounded-2xl overflow-hidden shadow-lg">
+            {/* Hero Image */}
+            <div className="aspect-[4/3] bg-surface-100 relative">
+              {heroImage ? (
+                <img src={heroImage} alt={solution} className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-surface-300">
+                  <Image size={48} strokeWidth={1} />
+                </div>
+              )}
+              {/* Badge */}
+              <div className="absolute top-3 left-3 bg-navy-900/80 backdrop-blur rounded-full px-3 py-1 text-white text-[10px] font-medium">
+                真实交付案例
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-4 space-y-3">
+              <h4 className="text-base font-bold text-gray-900">{solution}</h4>
+
+              <div className="space-y-2">
+                <div className="flex items-start gap-2">
+                  <span className="text-xs text-surface-400 flex-shrink-0 mt-0.5">需求</span>
+                  <p className="text-sm text-gray-700 leading-relaxed">{requirement}</p>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-xs text-surface-400 flex-shrink-0 mt-0.5">反馈</span>
+                  <p className="text-sm text-gray-700 leading-relaxed">{feedback}</p>
+                </div>
+              </div>
+
+              {/* Trust badge */}
+              <div className="flex items-center gap-1.5 text-[10px] text-green-600">
+                <CheckCircle2 size={12} />
+                隐私已处理的真实交付案例
+              </div>
+            </div>
+
+            {/* QR Code Section */}
+            <div className="border-t border-surface-100 p-4 flex items-center gap-4">
+              <div className="flex-shrink-0 w-[88px] h-[88px] bg-white border border-surface-200 rounded-xl p-1.5 flex items-center justify-center">
+                <QRCodeSVG value={shareUrl} size={72} level="M" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-gray-700 mb-1">扫码查看详情</p>
+                <p className="text-[11px] text-surface-400 leading-relaxed">长按识别二维码，查看真实案例详情并预约体验</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Hint */}
+          <p className="text-[10px] text-surface-400 text-center mt-3 leading-relaxed">
+            截图或长按海报保存到相册，分享给客户
+          </p>
+        </div>
+      </div>
     </div>
   );
 }

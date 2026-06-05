@@ -2,6 +2,7 @@ import { useState, useEffect, createContext, useContext, useCallback } from 'rea
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import type { User } from './mock/data';
 import { testUsers } from './mock/data';
+import { clearAuthToken, getCurrentUser, hydrateLocalCaches, loadBootstrap, loginWithApi } from './api/client';
 import BottomNav from './components/BottomNav';
 import Login from './pages/Login';
 import Home from './pages/Home';
@@ -36,11 +37,11 @@ import DealReportSubmit from './pages/DealReportSubmit';
 interface AuthContextType {
   user: User | null;
   authReady: boolean;
-  login: (phone: string, password: string) => boolean;
+  login: (phone: string, password: string) => Promise<boolean>;
   logout: () => void;
 }
 export const AuthContext = createContext<AuthContextType>({
-  user: null, authReady: false, login: () => false, logout: () => {},
+  user: null, authReady: false, login: async () => false, logout: () => {},
 });
 export const useAuth = () => useContext(AuthContext);
 
@@ -76,8 +77,16 @@ function AdminGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function LeadGuard({ children }: { children: React.ReactNode }) {
+  const { user, authReady } = useAuth();
+  if (!authReady) return null;
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role === 'installer') return <Navigate to="/delivery/tasks" replace />;
+  return <>{children}</>;
+}
+
 // 隐藏底部导航的路径
-const hideNavPaths = ['/login', '/cases', '/admin/delivery', '/admin/leads', '/admin/products'];
+const hideNavPaths = ['/login', '/cases', '/admin/delivery', '/admin/leads', '/admin/products', '/leads'];
 const hideNavPrefixes = ['/save-images/', '/delivery/upload/', '/delivery/story/', '/delivery/detail/', '/delivery/create', '/cases/', '/lead-form/', '/share/', '/deal-report/', '/admin/products/'];
 
 function shouldHideNav(pathname: string) {
@@ -95,12 +104,26 @@ export default function App() {
   const location = useLocation();
 
   useEffect(() => {
-    const stored = localStorage.getItem('sct-user');
-    if (stored) {
-      try { const u = JSON.parse(stored); setUser(u); }
-      catch { localStorage.removeItem('sct-user'); }
+    let cancelled = false;
+    async function restoreSession() {
+      const remoteUser = await getCurrentUser();
+      if (cancelled) return;
+      if (remoteUser) {
+        setUser(remoteUser);
+        localStorage.setItem('sct-user', JSON.stringify(remoteUser));
+        hydrateLocalCaches(await loadBootstrap());
+        if (!cancelled) setAuthReady(true);
+        return;
+      }
+      const stored = localStorage.getItem('sct-user');
+      if (stored) {
+        try { const u = JSON.parse(stored); setUser(u); }
+        catch { localStorage.removeItem('sct-user'); }
+      }
+      if (!cancelled) setAuthReady(true);
     }
-    setAuthReady(true);
+    void restoreSession();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
@@ -113,18 +136,27 @@ export default function App() {
     }
   }, [authReady, user, location.pathname, navigate]);
 
-  const login = useCallback((phone: string, password: string): boolean => {
-    const found = testUsers.find(u => u.phone === phone && u.password === password);
-    if (found) {
-      setUser(found);
-      localStorage.setItem('sct-user', JSON.stringify(found));
+  const login = useCallback(async (phone: string, password: string): Promise<boolean> => {
+    try {
+      const { user: apiUser } = await loginWithApi(phone, password);
+      setUser(apiUser);
+      localStorage.setItem('sct-user', JSON.stringify(apiUser));
+      hydrateLocalCaches(await loadBootstrap());
       return true;
+    } catch {
+      const found = testUsers.find(u => u.phone === phone && u.password === password);
+      if (found) {
+        setUser(found);
+        localStorage.setItem('sct-user', JSON.stringify(found));
+        return true;
+      }
+      return false;
     }
-    return false;
   }, []);
 
   const logout = useCallback(() => {
     setUser(null);
+    clearAuthToken();
     localStorage.removeItem('sct-user');
     navigate('/login', { replace: true });
   }, [navigate]);
@@ -188,6 +220,7 @@ export default function App() {
                 <Route path="/share/collection" element={<CaseCollectionShare />} />
                 <Route path="/lead-form/:caseId" element={<LeadForm />} />
                 {/* 客户线索管理 */}
+                <Route path="/leads" element={<LeadGuard><AdminLeads /></LeadGuard>} />
                 <Route path="/admin/leads" element={<AdminGuard><AdminLeads /></AdminGuard>} />
                 <Route path="/admin/products" element={<AdminGuard><AdminProducts /></AdminGuard>} />
                 <Route path="/admin/products/:id" element={<AdminGuard><AdminProductEdit /></AdminGuard>} />

@@ -1,4 +1,5 @@
-import { img, bedImg, mattressImg, luxuryImg, storeImg, deliveryImg, factoryImg, detailImg, caseImg } from '../utils/images';
+import { img, bedImg, mattressImg, luxuryImg, storeImg, deliveryImg, factoryImg, detailImg, caseImg, pillowImg } from '../utils/images';
+import { syncJson } from '../api/client';
 
 // ========== 类型定义 ==========
 
@@ -122,6 +123,7 @@ export interface Submission {
 }
 
 export interface ShareLeadPayload {
+  id?: string;
   alias: string;
   phone: string;
   city?: string;
@@ -133,6 +135,13 @@ export interface ShareLeadPayload {
   interestProduct: string;
   interestType: string;
   sourceAction: string;
+  sourceChannel?: string;
+  sourceEntry?: string;
+  sourceUrl?: string;
+  status?: '待联系' | '已联系' | '已到店' | '已成交' | '无效' | '暂不考虑';
+  notes?: string;
+  lastOperatorId?: string;
+  lastOperatedAt?: string;
   createdAt: string;
 }
 
@@ -158,6 +167,14 @@ export function loadShareLeads(): ShareLeadPayload[] {
         interestProduct: item.interestProduct || '',
         interestType: item.interestType || '咨询同款产品',
         sourceAction: item.sourceAction || 'consult_same_product',
+        sourceChannel: item.sourceChannel,
+        sourceEntry: item.sourceEntry,
+        sourceUrl: item.sourceUrl,
+        status: item.status,
+        notes: item.notes,
+        lastOperatorId: item.lastOperatorId,
+        lastOperatedAt: item.lastOperatedAt,
+        id: item.id,
         createdAt: item.createdAt || new Date().toISOString(),
       }));
   } catch { return []; }
@@ -165,6 +182,7 @@ export function loadShareLeads(): ShareLeadPayload[] {
 
 export function addShareLead(payload: ShareLeadPayload): void {
   localStorage.setItem(SHARE_LEADS_KEY, JSON.stringify([payload, ...loadShareLeads()]));
+  void syncJson('/api/leads', payload);
 }
 
 export function getLeadsForStore(storeId: string): ShareLeadPayload[] {
@@ -266,6 +284,10 @@ export const testUsers: User[] = [
     role: 'sales', storeName: '苏州体验店', storeId: 'store_sz', city: '苏州',
   },
   {
+    phone: 'sales003', password: '123456', name: '新导购',
+    role: 'sales', storeName: '苏州体验店', storeId: 'store_sz', city: '苏州',
+  },
+  {
     phone: 'installer001', password: '123456', name: '王师傅',
     role: 'installer', storeName: '安装团队A', storeId: '', city: '苏州', team: '安装团队A',
   },
@@ -279,6 +301,7 @@ export const testUsers: User[] = [
 export const mockSalesPersons: SalesPerson[] = [
   { id: 'sales_zhang', name: '张顾问', storeId: 'store_sz', storeName: '苏州体验店', userId: 'sales001' },
   { id: 'sales_li', name: '李顾问', storeId: 'store_sz', storeName: '苏州体验店', userId: 'sales002' },
+  { id: 'sales_new', name: '新导购', storeId: 'store_sz', storeName: '苏州体验店', userId: 'sales003' },
 ];
 
 // ========== 安装师傅数据 ==========
@@ -528,6 +551,181 @@ export const mockDeliveryTasks: DeliveryTask[] = [
     productCategory: '床垫',
     productModel: 'Pro Air 梵璞·怡风',
     keywords: ['Pro Air', '梵璞·怡风', '床垫', 'TEMPUR'],
+  },
+  {
+    id: 'd101',
+    storeId: 'store_sz', storeName: '苏州体验店',
+    salesId: 'sales_zhang', salesName: '张顾问',
+    installerId: 'installer_wang', installerName: '王师傅',
+    customerAlias: '王先生',
+    city: '苏州',
+    district: '工业园区',
+    scene: '新房主卧',
+    brand: 'TEMPUR',
+    model: '梵璞·怡然 软款 25cm',
+    size: '1.8m × 2.0m',
+    customerRequirement: '新房装修主卧床垫。王先生喜欢睡偏软一点的床，之前睡的棕垫太硬，每天早上起来肩膀压得酸。但太太担心太软的床垫对腰不好。',
+    authStatus: '可公开使用',
+    installImages: [deliveryImg(14, 800, 600), deliveryImg(15, 800, 600), deliveryImg(16, 800, 600)],
+    installStatus: 'completed',
+    installNote: '新房高层有电梯，安装顺利。客户现场试躺了快二十分钟才让师傅走，说太舒服了不想起来。',
+    storyWhy: '王先生和太太在三个品牌之间对比了快一个月。之前一直认为软床垫伤腰，来店里试了才发现好的软床垫是有支撑层的，不是那种一躺就陷下去的软。',
+    storyFocus: '最关注软硬度平衡。王先生喜欢软一点的包裹感，太太担心腰部支撑不够。两人一起在店里试了软款和中软款各15分钟。',
+    storyReason: '最终选了梵璞·怡然软款。独立袋装弹簧提供了足够的腰部支撑，天然乳胶层又给了王先生喜欢的柔软包裹感。导购让他们侧躺试了十分钟，太太说翻身的时候腰没有被顶起来的感觉，才放心选软款。',
+    storyFeedback: '送货后一周回访，王先生说「现在早上起来肩膀不酸了，而且翻身不会吵到太太」。太太说「之前担心太软，现在睡了快半个月腰没疼过，白担心了」。',
+    storyPublic: '适合公开传播',
+    reviewStatus: 'approved',
+    reviewNote: '案例故事完整，产品对比有理有据，客户反馈真实。已发放积分。',
+    salesPoints: 25,
+    installerPoints: 15,
+    storePoints: 20,
+    createdAt: '2026-05-15 10:30',
+    productName: 'TEMPUR Pro 梵璞·怡然',
+    productSeries: 'TEMPUR Pro 梵璞·怡然',
+    productCategory: '床垫',
+    productModel: '梵璞·怡然 软款 25cm',
+    keywords: ['TEMPUR Pro', '梵璞·怡然', '床垫', 'TEMPUR', '软款', '新房装修'],
+    privacyChecks: { hasFace: false, hasDoorNumber: false, hasPhoneOrAddress: false, hasDeliveryDocOrContract: false, hasPriceInfo: false, hasCompetitorBrand: false, hasClutteredScene: false },
+  },
+  {
+    id: 'd102',
+    storeId: 'store_nj', storeName: '南京体验店',
+    salesId: 'sales_zhang', salesName: '张顾问',
+    installerId: 'installer_liu', installerName: '刘师傅',
+    customerAlias: '李女士',
+    city: '南京',
+    district: '建邺区',
+    scene: '夫妻主卧',
+    brand: 'TEMPUR',
+    model: '梵璞·怡然 中软款 25cm',
+    size: '1.8m × 2.0m',
+    customerRequirement: '夫妻对床垫硬度偏好不同。先生体重偏重喜欢硬一点的支撑感，太太体型偏瘦喜欢软一点的包裹感。两人为选床垫争执不下，需要一个双方都能接受的方案。',
+    authStatus: '可公开使用',
+    installImages: [deliveryImg(17, 800, 600), deliveryImg(18, 800, 600), deliveryImg(19, 800, 600)],
+    installStatus: 'completed',
+    installNote: '客户家在十楼有电梯，安装过程顺利。师傅让夫妻两人都现场试躺确认满意后才离开。',
+    storyWhy: '李女士和先生前后来了店里四次。前三次都在纠结硬度，选了硬款太太觉得硌，选了软款先生觉得腰悬空。第四次两人专门挑了周末下午，在店里试了一个多小时。',
+    storyFocus: '最关注的是「一张床垫怎么同时满足两个人的硬度需求」。导购建议选中软款，两人各躺十分钟以上，用平时睡觉的姿势去感受。',
+    storyReason: '梵璞·怡然中软款的独立袋装弹簧很关键——每个弹簧独立响应压力，先生体重重的位置支撑更实，太太体重轻的位置感觉更软。等于一张床垫自动适应两个人的体重，不需要互相迁就。乳胶层又保证了侧睡的肩部舒适度。',
+    storyFeedback: '送货一周后李女士发来消息：「太神奇了，之前我们俩一翻身对方就醒，现在基本感觉不到了。而且我侧睡肩膀不麻了，他说腰那边有支撑不会悬着。终于不用讨论换床垫的事了！」',
+    storyPublic: '适合公开传播',
+    reviewStatus: 'approved',
+    reviewNote: '夫妻硬度偏好冲突的场景很有代表性，故事真实。已发放积分。',
+    salesPoints: 25,
+    installerPoints: 15,
+    storePoints: 20,
+    createdAt: '2026-05-16 14:00',
+    productName: 'TEMPUR Pro 梵璞·怡然',
+    productSeries: 'TEMPUR Pro 梵璞·怡然',
+    productCategory: '床垫',
+    productModel: '梵璞·怡然 中软款 25cm',
+    keywords: ['TEMPUR Pro', '梵璞·怡然', '床垫', 'TEMPUR', '中软款', '夫妻', '独立袋装弹簧'],
+    privacyChecks: { hasFace: false, hasDoorNumber: false, hasPhoneOrAddress: false, hasDeliveryDocOrContract: false, hasPriceInfo: false, hasCompetitorBrand: false, hasClutteredScene: false },
+  },
+  {
+    id: 'd103',
+    storeId: 'store_sz', storeName: '苏州体验店',
+    salesId: 'sales_li', salesName: '李顾问',
+    installerId: 'installer_wang', installerName: '王师傅',
+    customerAlias: '陈姐',
+    city: '苏州',
+    district: '吴江区',
+    scene: '旧床换新',
+    brand: 'TEMPUR',
+    model: 'Pro Air 梵璞·怡风',
+    size: '1.5m × 2.0m',
+    customerRequirement: '陈姐特别怕热，一到夏天旧床垫就闷汗，半夜经常热醒翻来覆去。这次换床垫最看重的就是透气性和凉爽感，其次才是支撑和舒适。',
+    authStatus: '可公开使用',
+    installImages: [deliveryImg(20, 800, 600), deliveryImg(21, 800, 600)],
+    installStatus: 'completed',
+    installNote: '客户家在多层三楼，搬运方便。五月天气已经开始热了，师傅安装完陈姐当场摸了床垫表面说确实凉凉的。',
+    storyWhy: '陈姐之前那张床垫是三四年前随便买的，夏天背面闷热难忍，只能铺凉席，但凉席又硬又不舒服。今年下定决心换一张专门针对透气性设计的床垫。',
+    storyFocus: '核心关注两点：一是面料是不是真的有凉感，二是透气层能不能把身体的热气排出去，而不是闷在床垫里。陈姐说「夏天不开空调的时候躺下去，能明显感觉到凉不凉」。',
+    storyReason: '推荐了Pro Air梵璞·怡风。这款用的凉感面料触感就有降温效果，加上内部透气通道设计加快空气流通，热气和湿气不容易积聚。陈姐在店里试躺了二十多分钟，说背面没有发热的感觉，当场就定了。',
+    storyFeedback: '安装后第三天陈姐发来消息：「昨天晚上没开空调只开了风扇，居然没热醒！后背不闷汗了，摸床单也是干爽的。早知道早换了，白受了好几个夏天的罪。」',
+    storyPublic: '适合公开传播',
+    reviewStatus: 'approved',
+    reviewNote: '易出汗客户的真实需求场景，产品卖点匹配用户痛点。已发放积分。',
+    salesPoints: 25,
+    installerPoints: 15,
+    storePoints: 20,
+    createdAt: '2026-05-17 09:15',
+    productName: 'Pro Air 梵璞·怡风',
+    productSeries: 'Pro Air 梵璞·怡风',
+    productCategory: '床垫',
+    productModel: 'Pro Air 梵璞·怡风',
+    keywords: ['Pro Air', '梵璞·怡风', '床垫', 'TEMPUR', '透气', '凉感', '夏季'],
+    privacyChecks: { hasFace: false, hasDoorNumber: false, hasPhoneOrAddress: false, hasDeliveryDocOrContract: false, hasPriceInfo: false, hasCompetitorBrand: false, hasClutteredScene: false },
+  },
+  {
+    id: 'd104',
+    storeId: 'store_nj', storeName: '南京体验店',
+    salesId: 'sales_zhang', salesName: '张顾问',
+    installerId: 'installer_liu', installerName: '刘师傅',
+    customerAlias: '赵先生',
+    city: '南京',
+    district: '秦淮区',
+    scene: '父母房',
+    brand: 'TEMPUR',
+    model: 'TEMPUR FORM™ 芸枫系列 25cm',
+    size: '1.5m × 2.0m',
+    customerRequirement: '赵先生父亲退休后腰部不适加重，早上起床要扶着床沿缓好一会儿才能站直。旧床垫用了快十年中间明显塌陷。赵先生想给父亲换一张腰部支撑好的床垫。',
+    authStatus: '可公开使用',
+    installImages: [deliveryImg(22, 800, 600), deliveryImg(23, 800, 600), deliveryImg(24, 800, 600)],
+    installStatus: 'completed',
+    installNote: '老小区二楼无电梯但搬运方便。老人很仔细，师傅安装的时候全程在旁边看，装完还用手按了按不同位置试弹性。',
+    storyWhy: '赵老先生退休前是中学教师，长期站着上课本来腰椎就不好，退休后旧床垫又塌了，每天早上起床成了最痛苦的事。赵先生带父亲跑了三家店，老人家每一张床垫都要躺十分钟以上才给评价。',
+    storyFocus: '老先生最在意的是「腰部这里有没有东西撑着」。他自己总结了一套判断标准：平躺的时候手掌插进腰和床垫之间的缝隙，如果手掌能轻松进去就没支撑，有阻力才算到位。',
+    storyReason: '最终选了TEMPUR FORM芸枫系列，因为芸枫用了双层独立弹簧+高密度支撑棉的组合，腰部区域做了针对性加固。老先生躺上去手掌插不进去，说「这就对了，感觉腰后面有东西托着」。而且边缘加固做得扎实，老人起夜的时候坐床边不会滑。',
+    storyFeedback: '安装后第十天赵先生来店里道谢：「我爸说现在早上起来可以直接站起来，不用扶床沿了。他说睡了十年才发现之前那根本不叫床垫。」',
+    storyPublic: '适合公开传播',
+    reviewStatus: 'approved',
+    reviewNote: '老人腰部支撑需求典型，客户自创的"手掌测试法"有传播力。已发放积分。',
+    salesPoints: 25,
+    installerPoints: 15,
+    storePoints: 20,
+    createdAt: '2026-05-18 11:00',
+    productName: 'TEMPUR FORM™ 芸枫系列',
+    productSeries: 'TEMPUR FORM™ 芸枫系列',
+    productCategory: '床垫',
+    productModel: 'TEMPUR FORM™ 芸枫系列 25cm',
+    keywords: ['TEMPUR FORM', '芸枫系列', '床垫', 'TEMPUR', '腰部支撑', '老人', '父母房'],
+    privacyChecks: { hasFace: false, hasDoorNumber: false, hasPhoneOrAddress: false, hasDeliveryDocOrContract: false, hasPriceInfo: false, hasCompetitorBrand: false, hasClutteredScene: false },
+  },
+  {
+    id: 'd105',
+    storeId: 'store_sz', storeName: '苏州体验店',
+    salesId: 'sales_zhang', salesName: '张顾问',
+    installerId: 'installer_wang', installerName: '王师傅',
+    customerAlias: '张姐',
+    city: '苏州',
+    district: '虎丘区',
+    scene: '客户卧室实拍',
+    brand: 'TEMPUR',
+    model: 'ErgoPlus 感温舒颈枕',
+    size: '标准尺寸 65cm × 40cm',
+    customerRequirement: '张姐长期在办公室看电脑，颈椎一直不舒服，偶尔还会手麻。睡眠姿势是侧睡为主，晚上经常要换两三个枕头调整高度。医生建议她换一个能固定颈部曲线的枕头。',
+    authStatus: '可公开使用',
+    installImages: [pillowImg(0, 800, 600), bedImg(10, 800, 600), bedImg(11, 800, 600)],
+    installStatus: 'completed',
+    installNote: '张姐是门店老客户介绍来的，到店时特意带了平时穿的睡衣来试枕。导购帮她测了肩宽和颈部曲线后才推荐型号。',
+    storyWhy: '张姐之前买枕头基本是超市随便拿的，要么太高侧睡脖子被顶着，要么太低头陷下去颈椎悬空。换过的枕头不下五六个，最贵的八百多也没解决问题。后来同事推荐来店里看看专业的枕头。',
+    storyFocus: '张姐最在意的是侧睡时颈椎能不能保持在一条直线上——因为侧睡肩宽会抬高头部，如果枕头高度不够或者材质太软压下去，颈椎就会歪。导购现场用肩宽测试帮她确定了合适的高度。',
+    storyReason: '推荐了感温舒颈枕。核心原因：一是它会根据体温微调形状，正好贴合颈部曲线，不像普通记忆棉那样冬天硬夏天软；二是蝴蝶形设计侧睡的时候肩膀不会压到枕边，颈椎能保持在自然位置。张姐试了十分钟侧睡姿势说「脖子第一次有被东西稳稳托住的感觉」。',
+    storyFeedback: '使用一周后张姐发来反馈：「早上起来脖子不那么僵硬了，手麻的频率也少了。最明显的是睡觉踏实了，半夜不用翻来覆去换枕头。我老公现在也想要一个。」',
+    storyPublic: '适合公开传播',
+    reviewStatus: 'approved',
+    reviewNote: '枕头类案例，填补了现有案例的产品品类空白。颈椎+侧睡场景典型。已发放积分。',
+    salesPoints: 20,
+    installerPoints: 5,
+    storePoints: 15,
+    createdAt: '2026-05-19 15:45',
+    productName: 'TEMPUR ErgoPlus™ Pillow 感温舒颈枕',
+    productSeries: 'TEMPUR ErgoPlus™ Pillow 感温舒颈枕',
+    productCategory: '枕头',
+    productModel: 'ErgoPlus 感温舒颈枕',
+    keywords: ['ErgoPlus', '感温舒颈枕', '枕头', 'TEMPUR', '颈椎', '侧睡', '温感'],
+    privacyChecks: { hasFace: false, hasDoorNumber: false, hasPhoneOrAddress: false, hasDeliveryDocOrContract: false, hasPriceInfo: false, hasCompetitorBrand: false, hasClutteredScene: false },
   },
 ];
 
@@ -918,6 +1116,7 @@ export function addDeliveryTask(task: Omit<DeliveryTask, 'id' | 'createdAt'>): D
     createdAt: new Date().toISOString().slice(0, 10),
   };
   saveStoredDeliveryTasks([newTask, ...loadStoredDeliveryTasks()]);
+  void syncJson('/api/delivery-tasks', newTask);
   return newTask;
 }
 
@@ -930,6 +1129,7 @@ export function updateDeliveryTask(id: string, patch: Partial<DeliveryTask>): vo
   if (idx >= 0) stored[idx] = updated;
   else stored.unshift(updated);
   saveStoredDeliveryTasks(stored);
+  void syncJson(`/api/delivery-tasks/${id}`, updated, 'PUT');
 }
 
 // ========== 公开案例数据 ==========
@@ -1104,6 +1304,18 @@ export const mockLeads: Lead[] = [
 
 export function getPublicCases(): PublicCase[] {
   return mockPublicCases.filter(c => c.publicVisible && c.images.length > 0);
+}
+
+// ========== 成交故事合并工具 ==========
+
+export function getStoryText(task: DeliveryTask): string {
+  const merged = [
+    task.storyWhy,
+    task.storyFocus,
+    task.storyReason,
+    task.storyFeedback,
+  ].filter(Boolean).join('\n\n');
+  return merged || '';
 }
 
 // ========== 客户分享辅助 ==========
@@ -1490,13 +1702,15 @@ export function getApprovedDealReports(): DealReport[] {
 
 export function addDealReport(report: Omit<DealReport, 'id' | 'status' | 'createdAt'>): void {
   const reports = loadDealReports();
-  reports.push({
+  const saved = {
     ...report,
     id: `dr-${Date.now()}`,
-    status: 'pending',
+    status: 'pending' as const,
     createdAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
-  });
+  };
+  reports.push(saved);
   saveDealReports(reports);
+  void syncJson('/api/deal-reports', saved);
 }
 
 export function updateDealReportStatus(id: string, status: DealReport['status']): void {
@@ -1505,11 +1719,13 @@ export function updateDealReportStatus(id: string, status: DealReport['status'])
   if (idx >= 0) {
     dynamic[idx].status = status;
     saveDealReports(dynamic);
+    void syncJson(`/api/deal-reports/${id}/review`, { status }, 'PUT');
     return;
   }
   const mockIdx = mockDealReports.findIndex(r => r.id === id);
   if (mockIdx >= 0) {
     mockDealReports[mockIdx].status = status;
+    void syncJson(`/api/deal-reports/${id}/review`, { status }, 'PUT');
   }
 }
 

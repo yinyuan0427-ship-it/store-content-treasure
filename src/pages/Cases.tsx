@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getPublicCases } from '../mock/data';
-import { Search, Camera, ShieldCheck, Shield, ChevronRight, MapPin, Store, Sparkles, Phone } from 'lucide-react';
+import { Search, Camera, ShieldCheck, Shield, ChevronRight, Store, Sparkles, Phone } from 'lucide-react';
 
-const cities = ['全部', '苏州', '南京', '无锡', '上海'];
 const brands = ['全部', 'TEMPUR'];
 const sceneLabels = ['全部', '新房装修', '客户卧室', '婚房', '老人房', '高端改善'];
 
@@ -11,12 +10,10 @@ export default function Cases() {
   const navigate = useNavigate();
   const cases = getPublicCases();
 
-  const [city, setCity] = useState('全部');
   const [brand, setBrand] = useState('全部');
   const [scene, setScene] = useState('全部');
 
   const filtered = cases.filter((c) => {
-    if (city !== '全部' && c.city !== city) return false;
     if (brand !== '全部' && c.brand !== brand) return false;
     if (scene !== '全部' && c.sceneLabel !== scene) return false;
     return true;
@@ -32,7 +29,7 @@ export default function Cases() {
         <div className="relative z-10">
           <h1 className="text-2xl font-bold text-white tracking-tight">真实交付案例</h1>
           <p className="text-blue-200/70 text-sm mt-2 leading-relaxed">
-            真实门店交付案例，已做客户隐私脱敏处理
+            真实交付案例，已做客户隐私脱敏处理
           </p>
 
           {/* Trust badges */}
@@ -55,17 +52,6 @@ export default function Cases() {
 
       {/* ── Filters ── */}
       <div className="px-5 py-4 space-y-3 bg-white border-b border-surface-200">
-        <div>
-          <p className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider mb-2">城市</p>
-          <div className="flex gap-2 overflow-x-auto no-scrollbar">
-            {cities.map((c) => (
-              <button key={c} onClick={() => setCity(c)}
-                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                  city === c ? 'bg-navy-800 text-white shadow-sm' : 'bg-surface-50 text-surface-500 active:bg-surface-100'
-                }`}>{c}</button>
-            ))}
-          </div>
-        </div>
         <div>
           <p className="text-[11px] font-semibold text-surface-400 uppercase tracking-wider mb-2">品牌</p>
           <div className="flex gap-2 overflow-x-auto no-scrollbar">
@@ -113,9 +99,6 @@ export default function Cases() {
               <div className="p-4">
                 {/* Tags row */}
                 <div className="flex gap-1.5 flex-wrap mb-3">
-                  <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-navy-800 text-white font-medium flex items-center gap-1">
-                    <MapPin size={10} />{c.city}
-                  </span>
                   <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-warm-50 text-warm-700 font-medium border border-warm-200">
                     {c.brand} {c.model}
                   </span>
@@ -153,14 +136,6 @@ export default function Cases() {
                   </div>
                 )}
 
-                {/* Source */}
-                <div className="flex items-center gap-1 mt-3 text-xs text-surface-400">
-                  <Store size={12} />
-                  <span>{c.storeName}</span>
-                  <span>·</span>
-                  <span>{c.salesName}</span>
-                </div>
-
                 {/* Actions */}
                 <div className="flex gap-2 mt-4">
                   <button onClick={() => navigate(`/cases/${c.id}`)}
@@ -184,11 +159,11 @@ export default function Cases() {
       <div className="bg-navy-900 px-5 py-10 text-center">
         <div className="flex items-center justify-center gap-2 mb-3">
           <Store size={20} className="text-warm-400" />
-          <span className="text-white font-bold text-lg tracking-tight">门店案例宝</span>
+          <span className="text-white font-bold text-lg tracking-tight">真实案例库</span>
         </div>
         <p className="text-navy-300 text-xs leading-relaxed">真实案例 · 隐私保护 · 专业睡眠顾问</p>
         <div className="mt-4 pt-4 border-t border-white/5">
-          <p className="text-navy-400 text-[11px]">本页面展示的案例均为真实门店交付案例</p>
+          <p className="text-navy-400 text-[11px]">本页面展示的案例均为真实交付案例</p>
           <p className="text-navy-400 text-[11px] mt-1">已对隐私信息进行脱敏处理，请放心浏览</p>
         </div>
       </div>

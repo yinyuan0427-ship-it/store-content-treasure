@@ -1,11 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { addShareLead, mockDeliveryTasks, canShareCase, getAllDeliveryTasks } from '../mock/data';
+import { mockDeliveryTasks, canShareCase, getAllDeliveryTasks, getStoryText } from '../mock/data';
+import type { DeliveryTask } from '../mock/data';
+import { fetchCaseById } from '../api/cases';
 import { findProductKnowledgeForTask } from '../mock/productKnowledge';
 import { copyText } from '../utils/clipboard';
+import { buildShareQuery, generateShareTitle, generateShareDescription, getShareImageUrl, getShareUrl, setShareMeta } from '../utils/share';
+import { getAdvisorContact } from '../utils/advisor';
+import { createShareLead } from '../utils/leads';
 import {
-  Store, MapPin, Shield, CheckCircle2, Camera,
-  MessageCircle, Phone, ChevronLeft, Star, Heart,
+  Shield, CheckCircle2, Camera,
+  MessageCircle, Phone, ChevronLeft, ChevronRight, X, Star, Heart,
   Copy, QrCode, UserPlus, ShoppingBag, Award, Clock
 } from 'lucide-react';
 
@@ -19,7 +24,7 @@ function getCustomerTitle(task: NonNullable<ReturnType<typeof mockDeliveryTasks.
     '儿童房': '给宝宝一个安心好眠的童年',
     '客户卧室实拍': '真实客户的家，真实的睡眠改善',
   };
-  return titles[task.scene] || `${task.city} · ${task.scene} · ${task.brand} ${task.model}`;
+  return titles[task.scene] || `${task.scene} · ${task.brand} ${task.model}`;
 }
 
 export default function CustomerCaseShare() {
@@ -27,10 +32,86 @@ export default function CustomerCaseShare() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const salesId = searchParams.get('salesId') || '';
+  const storeIdParam = searchParams.get('storeId') || '';
+  const channel = searchParams.get('channel') || 'wechat_private';
+  const entry = searchParams.get('entry') || 'case_share';
+  const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null);
+  const [remoteTask, setRemoteTask] = useState<DeliveryTask | null>(null);
+  const [remoteLoaded, setRemoteLoaded] = useState(false);
 
-  const task = getAllDeliveryTasks().find(t => t.id === caseId);
+  const localTask = getAllDeliveryTasks().find(t => t.id === caseId);
+  const task = localTask || remoteTask;
+  const resolvedStoreId = storeIdParam || task?.storeId || '';
 
-  if (!task || !canShareCase(task)) {
+  useEffect(() => {
+    if (!caseId || localTask) {
+      setRemoteLoaded(true);
+      return;
+    }
+
+    let cancelled = false;
+    setRemoteLoaded(false);
+    fetchCaseById(caseId).then((caseTask) => {
+      if (cancelled) return;
+      setRemoteTask(caseTask);
+      setRemoteLoaded(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [caseId, localTask?.id]);
+
+  // Set dynamic meta tags for WeChat card preview
+  useEffect(() => {
+    if (task && canShareCase(task)) {
+      setShareMeta({
+        title: generateShareTitle(task),
+        description: generateShareDescription(task),
+        image: getShareImageUrl(task),
+        url: getShareUrl(task.id, salesId || task.salesId, {
+          storeId: resolvedStoreId,
+          channel,
+          entry,
+        }),
+      });
+    } else {
+      setShareMeta(); // fallback to defaults
+    }
+    return () => { setShareMeta(); };
+  }, [task?.id, salesId, resolvedStoreId, channel, entry]);
+
+  if (!task && !remoteLoaded) {
+    return (
+      <div className="min-h-screen bg-surface-50 flex items-center justify-center px-5">
+        <div className="text-center max-w-sm">
+          <div className="w-16 h-16 bg-surface-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Shield size={28} className="text-surface-400" />
+          </div>
+          <p className="text-sm text-surface-500">正在加载案例...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!task) {
+    return (
+      <div className="min-h-screen bg-surface-50 flex items-center justify-center px-5">
+        <div className="text-center max-w-sm">
+          <div className="w-16 h-16 bg-surface-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Shield size={28} className="text-surface-400" />
+          </div>
+          <h1 className="text-lg font-semibold text-gray-900 mb-2">案例不存在</h1>
+          <button onClick={() => navigate('/')}
+            className="mt-6 px-6 py-2.5 bg-navy-800 text-white font-medium rounded-xl text-sm active:bg-navy-900 transition-colors">
+            返回首页
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!canShareCase(task)) {
     return (
       <div className="min-h-screen bg-surface-50 flex items-center justify-center px-5">
         <div className="text-center max-w-sm">
@@ -51,7 +132,7 @@ export default function CustomerCaseShare() {
   }
 
   const customerTitle = getCustomerTitle(task);
-  const caseSubtitle = `${task.city}${task.customerAlias} · ${task.scene} · ${task.brand} ${task.model}`;
+  const caseSubtitle = `${task.customerAlias} · ${task.scene} · ${task.brand} ${task.model}`;
 
   const productKnowledge = findProductKnowledgeForTask({
     productSeries: task.productSeries,
@@ -74,10 +155,6 @@ export default function CustomerCaseShare() {
     ? productKnowledge.fitCustomers.slice(0, 3)
     : ['睡眠质量差', '腰椎不适', '对床垫有要求'];
 
-  const storeCaseCount = getAllDeliveryTasks().filter(
-    t => t.storeId === task.storeId && (t.reviewStatus === 'approved' || t.reviewStatus === 'featured')
-  ).length;
-
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* ── Photo Carousel ── */}
@@ -89,7 +166,7 @@ export default function CustomerCaseShare() {
 
         <div className="flex overflow-x-auto snap-x snap-mandatory no-scrollbar w-full aspect-[4/3]">
           {task.installImages.map((img, i) => (
-            <div key={i} className="w-full flex-shrink-0 snap-center">
+            <div key={i} className="w-full flex-shrink-0 snap-center cursor-pointer" onClick={() => setPreviewImageIndex(i)}>
               <img src={img} alt={`${task.scene}实拍${i + 1}`}
                 className="w-full aspect-[4/3] object-cover" />
             </div>
@@ -104,18 +181,10 @@ export default function CustomerCaseShare() {
 
       {/* ── Content ── */}
       <div className="flex-1 px-5 pt-5 pb-32 space-y-5">
-        {/* Service & location */}
-        <div className="flex items-center gap-2 text-sm text-surface-500">
-          <div className="flex items-center gap-1"><Store size={14} /><span>本地服务</span></div>
-          <span>·</span>
-          <div className="flex items-center gap-1"><MapPin size={14} /><span>{task.city}{task.district ? ` ${task.district}` : ''}</span></div>
-        </div>
-
         {/* Customer-facing title */}
         <div>
           <h1 className="text-xl font-bold text-gray-900 leading-snug">{customerTitle}</h1>
           <p className="text-sm text-surface-400 mt-1">{caseSubtitle}</p>
-          <p className="text-xs text-surface-400 mt-0.5">{task.salesName} 为您服务</p>
         </div>
 
         {/* Trust badges */}
@@ -126,7 +195,7 @@ export default function CustomerCaseShare() {
           </div>
           <div className="flex items-center gap-1.5 bg-surface-50 rounded-full px-3 py-1.5 text-xs text-surface-500">
             <Shield size={14} className="text-navy-600 flex-shrink-0" />
-            <span>真实门店交付案例</span>
+            <span>真实交付案例</span>
           </div>
           <div className="flex items-center gap-1.5 bg-surface-50 rounded-full px-3 py-1.5 text-xs text-surface-500">
             <Star size={14} className="text-warm-500 flex-shrink-0" fill="#f5a932" />
@@ -144,30 +213,16 @@ export default function CustomerCaseShare() {
           <p className="text-sm text-surface-600 leading-relaxed">{task.customerRequirement}</p>
         </div>
 
-        {/* Customer feedback */}
-        {task.storyFeedback && (
+        {/* 成交故事 */}
+        {getStoryText(task) && (
           <div className="relative">
             <div className="absolute -top-2 left-4 text-4xl text-warm-200 leading-none select-none">&ldquo;</div>
             <div className="bg-warm-50/60 border border-warm-100 rounded-2xl p-5 pt-5">
               <h2 className="text-[15px] font-bold text-warm-800 mb-2 flex items-center gap-1.5">
-                <Star size={18} className="text-warm-500" fill="#f5a932" />客户反馈
+                <Star size={18} className="text-warm-500" fill="#f5a932" />成交故事
               </h2>
-              <p className="text-sm text-warm-800 leading-relaxed">{task.storyFeedback}</p>
-              {task.storyFocus && (
-                <p className="text-xs text-warm-600 mt-2">客户最关注：{task.storyFocus}</p>
-              )}
+              <p className="text-sm text-warm-800 leading-relaxed whitespace-pre-wrap">{getStoryText(task)}</p>
             </div>
-          </div>
-        )}
-
-        {/* Solution */}
-        {task.storyReason && (
-          <div className="bg-surface-50 rounded-2xl p-4">
-            <h2 className="text-[15px] font-bold text-gray-900 mb-2">解决方案</h2>
-            <p className="text-sm text-surface-600 leading-relaxed">{task.storyReason}</p>
-            {task.storyWhy && (
-              <p className="text-xs text-surface-500 mt-2 leading-relaxed">{task.storyWhy}</p>
-            )}
           </div>
         )}
 
@@ -233,49 +288,105 @@ export default function CustomerCaseShare() {
         {/* Service trust */}
         <div className="bg-surface-50 rounded-2xl p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
-            <Store size={16} className="text-navy-600" />本地门店服务
+            <CheckCircle2 size={16} className="text-navy-600" />专业睡眠服务
           </h2>
           <div className="space-y-2 text-sm">
             <div className="flex items-center gap-2">
-              <MapPin size={14} className="text-surface-400 flex-shrink-0" />
-              <span className="text-surface-600">支持预约到店体验</span>
+              <CheckCircle2 size={14} className="text-green-500 flex-shrink-0" />
+              <span className="text-surface-600">支持预约体验</span>
             </div>
             <div className="flex items-center gap-2">
               <Star size={14} className="text-warm-400 flex-shrink-0" fill="#f5a932" />
-              <span className="text-surface-600">本店已积累 {storeCaseCount} 个真实案例</span>
+              <span className="text-surface-600">真实案例已通过审核</span>
             </div>
             <div className="flex items-center gap-2">
               <Clock size={14} className="text-surface-400 flex-shrink-0" />
-              <span className="text-surface-600">支持到店试睡体验</span>
+              <span className="text-surface-600">睡眠顾问提供一对一建议</span>
             </div>
           </div>
           <p className="text-xs text-surface-400 mt-3 leading-relaxed">
-            可预约到店免费体验多款产品，专业睡眠顾问一对一服务
+            可咨询同款产品、睡感差异和适合人群，帮助您更高效地找到合适方案
           </p>
         </div>
+
+        {/* More cases entry */}
+        <button
+          onClick={() => navigate(`/share/collection?${buildShareQuery({
+            caseId: task.id,
+            salesId: salesId || task.salesId,
+            storeId: resolvedStoreId,
+            channel,
+            entry: 'share_more_cases',
+            extra: { fromCaseId: task.id },
+          })}`)}
+          className="w-full bg-navy-50 border border-navy-100 rounded-2xl p-4 flex items-center justify-between active:bg-navy-100 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Camera size={16} className="text-navy-600" />
+            <span className="text-sm font-medium text-navy-700">
+              {task.productSeries || task.productModel ? '查看更多同款案例' : '查看更多相似案例'}
+            </span>
+          </div>
+          <ChevronRight size={16} className="text-navy-400" />
+        </button>
 
         {/* Privacy notice */}
         <div className="bg-surface-50 rounded-xl p-3 flex items-start gap-2">
           <Shield size={14} className="text-surface-400 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-surface-400 leading-relaxed">
-            本案例为真实门店交付案例，隐私信息已脱敏处理。
+            本案例为真实交付案例，隐私信息已脱敏处理。
           </p>
         </div>
       </div>
 
+      {/* ── Image Preview Overlay ── */}
+      {previewImageIndex !== null && (
+        <div className="fixed inset-0 z-50 bg-black/95 flex flex-col" onClick={() => setPreviewImageIndex(null)}>
+          <button onClick={() => setPreviewImageIndex(null)}
+            className="absolute top-12 right-4 z-10 w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white active:bg-white/20 transition-colors">
+            <X size={22} />
+          </button>
+          <div className="flex-1 flex items-center justify-center px-4" onClick={(e) => e.stopPropagation()}>
+            <img src={task.installImages[previewImageIndex]} alt={`实拍${previewImageIndex + 1}`}
+              className="max-w-full max-h-[85vh] object-contain select-none" />
+          </div>
+          <div className="flex items-center justify-center gap-6 pb-10 pt-4">
+            <button onClick={(e) => { e.stopPropagation(); setPreviewImageIndex(prev => prev === null ? 0 : prev === 0 ? task.installImages.length - 1 : prev - 1); }}
+              className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white active:bg-white/20 transition-colors">
+              <ChevronLeft size={22} />
+            </button>
+            <span className="text-white/80 text-sm font-medium tabular-nums">{previewImageIndex + 1} / {task.installImages.length}</span>
+            <button onClick={(e) => { e.stopPropagation(); setPreviewImageIndex(prev => prev === null ? 0 : prev === task.installImages.length - 1 ? 0 : prev + 1); }}
+              className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white active:bg-white/20 transition-colors">
+              <ChevronRight size={22} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Bottom CTAs ── */}
-      <BottomActions task={task} customerTitle={customerTitle} salesId={salesId} />
+      <BottomActions
+        task={task}
+        customerTitle={customerTitle}
+        salesId={salesId}
+        storeId={resolvedStoreId}
+        channel={channel}
+        entry={entry}
+      />
     </div>
   );
 }
 
 // ── Bottom Actions ──
 function BottomActions({
-  task, customerTitle, salesId,
+  task, customerTitle, salesId, storeId, channel, entry,
 }: {
   task: NonNullable<ReturnType<typeof mockDeliveryTasks.find>>;
   customerTitle: string;
   salesId: string;
+  storeId: string;
+  channel: string;
+  entry: string;
 }) {
   const [leadInterestType, setLeadInterestType] = useState<string | null>(null);
   const [showContactSheet, setShowContactSheet] = useState(false);
@@ -298,7 +409,7 @@ function BottomActions({
       {leadInterestType && (
         <LeadFormModal
           task={task} customerTitle={customerTitle}
-          salesId={salesId} interestType={leadInterestType}
+          salesId={salesId} storeId={storeId} channel={channel} entry={entry} interestType={leadInterestType}
           onClose={() => setLeadInterestType(null)}
         />
       )}
@@ -306,6 +417,7 @@ function BottomActions({
         <ContactAdvisorSheet
           task={task} customerTitle={customerTitle}
           salesId={salesId}
+          storeId={storeId}
           onClose={() => setShowContactSheet(false)}
           onRequestLead={() => {
             setShowContactSheet(false);
@@ -319,17 +431,19 @@ function BottomActions({
 
 // ── Contact Advisor Sheet ──
 function ContactAdvisorSheet({
-  task, customerTitle, salesId, onClose, onRequestLead,
+  task, customerTitle, salesId, storeId, onClose, onRequestLead,
 }: {
   task: NonNullable<ReturnType<typeof mockDeliveryTasks.find>>;
   customerTitle: string;
   salesId: string;
+  storeId: string;
   onClose: () => void;
   onRequestLead: () => void;
 }) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'success' | 'failed'>('idle');
 
-  const wechatId = `tempur-${task.city === '苏州' ? 'suzhou' : task.city === '南京' ? 'nanjing' : task.city === '无锡' ? 'wuxi' : 'shanghai'}001`;
+  const advisor = getAdvisorContact({ salesId: salesId || task.salesId, storeId });
+  const wechatId = advisor.wechatId;
 
   const handleCopyWechat = async () => {
     const result = await copyText(wechatId);
@@ -348,7 +462,7 @@ function ContactAdvisorSheet({
         <div className="px-5 pb-6">
           <h3 className="text-lg font-bold text-gray-900 mb-1">联系睡眠顾问</h3>
           <p className="text-xs text-surface-400 mb-4">
-            了解同款方案详情，顾问一对一为您服务
+            了解同款方案详情，睡眠顾问提供一对一咨询
           </p>
 
           <div className="bg-surface-50 rounded-xl px-3 py-2.5 text-xs text-surface-600 mb-4 space-y-1">
@@ -362,10 +476,6 @@ function ContactAdvisorSheet({
             </div>
             {task.productSeries && (
               <div className="flex justify-between"><span className="text-surface-400">产品系列</span><span className="font-medium text-gray-800">{task.productSeries}</span></div>
-            )}
-            <div className="flex justify-between"><span className="text-surface-400">城市</span><span className="font-medium text-gray-800">{task.city}</span></div>
-            {(salesId || task.salesId) && (
-              <div className="flex justify-between"><span className="text-surface-400">专属顾问</span><span className="font-medium text-gray-800">{task.salesName}</span></div>
             )}
           </div>
 
@@ -438,38 +548,47 @@ function ContactAdvisorSheet({
 
 // ── Lead Form Modal ──
 function LeadFormModal({
-  task, customerTitle, salesId, interestType, onClose,
+  task, customerTitle, salesId, storeId, channel, entry, interestType, onClose,
 }: {
   task: NonNullable<ReturnType<typeof mockDeliveryTasks.find>>;
   customerTitle: string;
   salesId: string;
+  storeId: string;
+  channel: string;
+  entry: string;
   interestType: string;
   onClose: () => void;
 }) {
   const [alias, setAlias] = useState('');
   const [phone, setPhone] = useState('');
+  const [city, setCity] = useState('');
   const [product, setProduct] = useState(`${task.brand} ${task.model}`);
   const [remark, setRemark] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const phoneValid = /^1[3-9]\d{9}$/.test(phone.trim());
 
   const handleSubmit = () => {
-    if (!alias.trim() || !phone.trim() || phone.length < 11 || !agreed) return;
+    if (!alias.trim() || !phoneValid || !agreed) return;
 
     const leadPayload = {
       alias: alias.trim(),
       phone: phone.trim(),
+      city: city.trim(),
       remark: remark.trim(),
       sourceCaseId: task.id,
       sourceSalesId: salesId || task.salesId,
-      sourceStoreId: task.storeId,
+      sourceStoreId: storeId || task.storeId,
       sourceStoreName: task.storeName,
       interestProduct: product.trim() || task.model,
       interestType,
       sourceAction: interestType === '咨询同款产品' ? 'consult_same_product' : 'book_same_product',
+      sourceChannel: channel,
+      sourceEntry: entry,
+      sourceUrl: window.location.href,
       createdAt: new Date().toISOString(),
     };
-    addShareLead(leadPayload);
+    createShareLead(leadPayload);
     setSubmitted(true);
   };
 
@@ -484,14 +603,8 @@ function LeadFormModal({
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-2">已收到您的预约</h3>
             <p className="text-sm text-surface-500 leading-relaxed">
-              {task.salesName} 会尽快联系您
+              睡眠顾问将尽快联系您
             </p>
-            <div className="mt-3 bg-surface-50 rounded-xl p-3 text-left">
-              <div className="flex items-center gap-2">
-                <MapPin size={14} className="text-surface-400" />
-                <span className="text-xs text-surface-600">{task.city}</span>
-              </div>
-            </div>
             <p className="text-xs text-surface-400 mt-3">请保持手机畅通</p>
             <button onClick={onClose}
               className="w-full h-11 bg-navy-800 text-white font-semibold rounded-xl text-sm mt-4 active:bg-navy-900 transition-colors">
@@ -517,7 +630,7 @@ function LeadFormModal({
 
           <div className="bg-surface-50 rounded-xl px-3 py-2 text-xs text-surface-500 mb-4 flex items-center gap-1.5">
             <ShoppingBag size={12} />
-            <span className="truncate">{task.brand} {task.model} · {task.city}</span>
+            <span className="truncate">{task.brand} {task.model}</span>
           </div>
 
           <div className="space-y-3">
@@ -536,6 +649,16 @@ function LeadFormModal({
                   placeholder="请输入手机号"
                   className="flex-1 h-11 bg-transparent text-sm focus:outline-none" />
               </div>
+              {phone.trim() && !phoneValid && (
+                <p className="text-[10px] text-red-500 mt-1">请输入有效的 11 位手机号</p>
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-700 mb-1 block">您所在城市 <span className="text-xs text-surface-400 font-normal">（可选）</span></label>
+              <input type="text" value={city} onChange={(e) => setCity(e.target.value)}
+                placeholder="用于安排就近服务"
+                className="w-full h-11 px-3 bg-surface-50 border border-surface-200 rounded-xl text-sm focus:outline-none focus:border-navy-400 transition-colors" />
             </div>
 
             <div>
@@ -564,19 +687,19 @@ function LeadFormModal({
                 )}
               </div>
               <span className={`text-xs leading-relaxed ${agreed ? 'text-gray-700' : 'text-surface-500'}`}>
-                我同意门店通过电话联系我 <span className="text-red-400">*</span>
+                我同意睡眠顾问通过电话联系我 <span className="text-red-400">*</span>
               </span>
             </button>
 
             <button onClick={handleSubmit}
-              disabled={!alias.trim() || phone.trim().length < 11 || !agreed}
+              disabled={!alias.trim() || !phoneValid || !agreed}
               className="w-full h-12 bg-navy-800 text-white font-semibold rounded-xl text-sm active:bg-navy-900 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm">
               提交预约
             </button>
           </div>
 
           <p className="text-[10px] text-surface-400 text-center mt-3 leading-relaxed">
-            信息仅用于门店联系您，不会公开或转给第三方
+            信息仅用于睡眠顾问联系您，不会公开或转给第三方
           </p>
         </div>
       </div>

@@ -1,11 +1,12 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth, useFavorites } from '../App';
-import { getAllDeliveryTasks, getAllPointRecords, mockSalesRank, mockInstallerRank, mockStoreRank, mockCityRank, mockMaterials, mockDeliveryTasks, POINTS_RULES, getTotalDailyPoints, getCaseCoinBalance, getDeliveryRewardSummary, getDeliveryPointBalance, getDeliveryPointRecords, canShareCase, mockSalesPersons, mockLeads, getLeadsForStore, getInstallerByUserId } from '../mock/data';
+import { getAllDeliveryTasks, getAllPointRecords, mockSalesRank, mockInstallerRank, mockStoreRank, mockCityRank, mockMaterials, mockDeliveryTasks, POINTS_RULES, getTotalDailyPoints, getCaseCoinBalance, getDeliveryRewardSummary, getDeliveryPointBalance, getDeliveryPointRecords, canShareCase, mockSalesPersons, getInstallerByUserId } from '../mock/data';
 import { useMemo, useState } from 'react';
 import {
   Star, Trophy, Store, ChevronRight, LogOut, Heart, FileText, Upload, Medal,
   Megaphone, Camera, Sparkles, UserPlus, CheckCircle2, Coins, Award
 } from 'lucide-react';
+import { getAllManagedLeads } from '../utils/leads';
 
 const roleLabels: Record<string, string> = {
   admin: '管理员',
@@ -70,7 +71,7 @@ export default function Profile() {
     const pendingReview = storeTasks.filter(t => t.reviewStatus === 'pending' || t.reviewStatus === 'story_done').length;
     const rejected = storeTasks.filter(t => t.reviewStatus === 'rejected').length;
     const storeSales = mockSalesPersons.filter(s => s.storeId === user?.storeId).length;
-    const pendingLeads = mockLeads.filter(l => l.sourceStoreId === user?.storeId && l.status === '待联系').length + getLeadsForStore(user?.storeId || '').length;
+    const pendingLeads = getAllManagedLeads(user).filter(l => l.status === '待联系').length;
     return { shareable, pendingStory, pendingReview, rejected, storeSales, pendingLeads };
   }, [isDealerOwner, storeTasks, user?.storeId]);
   const rewardSummary = useMemo(() => isInstaller ? getDeliveryRewardSummary(uid) : null, [uid, isInstaller]);

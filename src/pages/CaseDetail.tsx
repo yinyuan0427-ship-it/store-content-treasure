@@ -1,6 +1,6 @@
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { mockPublicCases } from '../mock/data';
-import { ArrowLeft, MapPin, Store, ShieldCheck, ChevronRight, Sparkles, Phone } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, ChevronRight, Sparkles, Phone } from 'lucide-react';
 
 export default function CaseDetail() {
   const { caseId } = useParams<{ caseId: string }>();
@@ -45,15 +45,9 @@ export default function CaseDetail() {
 
       {/* ── Content ── */}
       <div className="px-5 pt-5 pb-24 space-y-5">
-        {/* City & Scene */}
+        {/* Scene */}
         <div>
           <div className="flex gap-2 mb-3">
-            <span className="text-xs px-2.5 py-1 rounded-full bg-navy-800 text-white font-medium flex items-center gap-1">
-              <MapPin size={10} />{c.city}
-            </span>
-            {c.district && (
-              <span className="text-xs px-2.5 py-1 rounded-full bg-surface-100 text-surface-500 font-medium">{c.district}</span>
-            )}
             <span className="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-blue-600 font-medium">{c.sceneLabel}</span>
           </div>
           <h1 className="text-xl font-bold text-gray-900 leading-tight">{c.storyTitle}</h1>
@@ -72,10 +66,6 @@ export default function CaseDetail() {
           <div className="flex justify-between text-sm">
             <span className="text-surface-400">使用场景</span>
             <span className="text-gray-900">{c.scene}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-surface-400">服务门店</span>
-            <span className="text-gray-900">{c.storeName}</span>
           </div>
         </div>
 
@@ -123,7 +113,7 @@ export default function CaseDetail() {
         <div className="bg-navy-50 rounded-2xl p-4 flex items-center gap-3 border border-navy-100">
           <ShieldCheck size={18} className="text-navy-600 flex-shrink-0" />
           <p className="text-xs text-navy-700 leading-relaxed">
-            本案例为真实门店交付案例，已对隐私信息进行脱敏处理
+            本案例为真实交付案例，已对隐私信息进行脱敏处理
           </p>
         </div>
       </div>

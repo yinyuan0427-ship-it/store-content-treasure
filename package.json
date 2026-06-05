@@ -5,11 +5,20 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:server": "node server/index.js",
+    "dev:server:local": "set LOCAL_STORE=1&& node server/index.js",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node server/index.js",
+    "db:init": "node server/init-db.js"
   },
   "dependencies": {
+    "express": "^5.2.1",
     "lucide-react": "^1.14.0",
+    "multer": "^2.1.1",
+    "pg": "^8.21.0",
+    "pg-mem": "^3.0.14",
+    "qrcode.react": "^4.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.21.0"

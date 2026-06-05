@@ -10,3 +10,13 @@ Thumbs.db
 
 *.log
 .config.toml.lock
+
+# Large binaries & archives
+*.exe
+*.zip
+*.tar.gz
+*.7z
+
+# Testing artifacts
+.playwright-cli/
+.playwright-mcp/
