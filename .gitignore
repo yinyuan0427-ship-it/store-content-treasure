@@ -20,3 +20,7 @@ Thumbs.db
 # Testing artifacts
 .playwright-cli/
 .playwright-mcp/
+
+# Runtime data
+logs/
+uploads/
